@@ -13,6 +13,8 @@ from urllib.error import URLError
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
+import os as _os
+_os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
 
 
 # ============================================================
@@ -498,7 +500,7 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"[错误] {e}")
         if "记住" in q:
-            fact = q.split("记住", 1)[1].strip()
+            fact = q.split("记住", 1)[1].strip().lstrip(" ，,、。.：:")
             if fact:
                 MEMORY.add(fact)
                 print(f"\n[记忆] 已记住: {fact}")
@@ -550,7 +552,7 @@ if __name__ == "__main__":
                 print(f"[错误] {e}")
             
             if "记住" in q:
-                fact = q.split("记住", 1)[1].strip()
+                fact = q.split("记住", 1)[1].strip().lstrip(" ，,、。.：:")
                 if fact and MEMORY.add(fact):
                     print(f"\n[记忆] 已记住: {fact}")
                     print(f"[记忆] 当前共 {len(MEMORY.facts)} 条")
