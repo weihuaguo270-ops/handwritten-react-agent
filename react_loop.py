@@ -417,7 +417,11 @@ def react_loop(user_query, max_steps=10):
 # 运行测试
 # ============================================================
 if __name__ == "__main__":
-    tests = [
+    import sys as _sys
+    if len(_sys.argv) > 1:
+        tests = [_sys.argv[1]]
+    else:
+        tests = [
         "先告诉我时间，再计算 100 / 7",
         "搜索一下2026年AI Agent的最新发展",
         "先搜索AI Agent的维基百科词条，打开第一条结果，然后总结内容（用中文）",
