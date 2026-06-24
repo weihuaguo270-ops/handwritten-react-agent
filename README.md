@@ -42,7 +42,8 @@
 修改 `react_loop.py` 顶部：
 
 ```python
-API_KEY=*** = "https://api.deepseek.com"  # 或其他兼容 API
+API_KEY=***
+BASE_URL = "https://api.deepseek.com"
 MODEL = "deepseek-v4-flash"
 ```
 
