@@ -14,7 +14,7 @@ from urllib.error import URLError
 # ============================================================
 # 第一步：配置（换成你的 API Key 和地址）
 # ============================================================
-API_KEY=***...
+API_KEY='***'
 BASE_URL = "https://api.deepseek.com"    # DeepSeek 官方地址
 MODEL = "deepseek-v4-flash"               # DeepSeek V4 Flash
 
@@ -39,40 +39,147 @@ def tool_get_time() -> str:
 
 import urllib.request as _req
 import urllib.parse as _parse
+import urllib.parse as _up
 
-def tool_web_search(query: str, max_results: int = 5) -> str:
-    """搜索维基百科获取信息（稳定、可靠、无需API Key）"""
+def tool_web_search(query: str, max_results: int = 1) -> str:
+    """搜索互联网，返回实时新闻结果"""
     try:
         import json as _json
+        import urllib.request as _ur
 
-        # 先查中文维基，如果没有结果再查英文
-        for lang, api_url in [("zh", "https://zh.wikipedia.org/w/api.php"),
-                              ("en", "https://en.wikipedia.org/w/api.php")]:
-            url = (f"{api_url}?action=query&list=search"
-                   f"&srsearch={_parse.quote(query)}"
-                   f"&format=json&srlimit={max_results}")
-            r = _req.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with _req.urlopen(r, timeout=10) as resp:
-                data = _json.loads(resp.read().decode("utf-8"))
+        max_results = min(max(1, max_results), 5)  # 至少1条，最多5条
+        payload = _json.dumps({
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "params": {
+                "name": "search",
+                "arguments": {
+                    "query": query,
+                    "content_types": "news",
+                    "max_results": max_results,
+                    "zone": "intl"
+                }
+            },
+            "id": 1
+        }).encode()
 
-            items = data.get("query", {}).get("search", [])
-            if items:
-                results = []
-                for idx, item in enumerate(items[:max_results]):
-                    title = item["title"]
-                    snippet = re.sub(r'<[^>]+>', '', item["snippet"])
-                    results.append(f"{idx+1}. {title}")
-                    results.append(f"   {snippet.strip()[:200]}")
-                return "\n".join(results)
+        req = _ur.Request(
+            "https://api.anysearch.com/mcp",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0"
+            },
+            method="POST"
+        )
 
-        return "搜索未找到相关结果"
+        with _ur.urlopen(req, timeout=15) as resp:
+            data = _json.loads(resp.read().decode())
+
+        result_text = data.get("result", {}).get("content", [{}])[0].get("text", "")
+        if not result_text or "Search Results" not in result_text:
+            return "搜索未找到相关结果"
+
+        # 解析 markdown 格式的结果
+        results = []
+        idx = 0
+        for line in result_text.split("\n"):
+            if line.startswith("### "):
+                idx += 1
+                title = line[4:].strip()
+                title = title.split(". ", 1)[1] if ". " in title else title
+                results.append(f"{idx}. {title}")
+            elif line.startswith("- **URL**"):
+                url = line.replace("- **URL**: ", "").strip()
+                results.append(f"   链接: {url}")
+            elif line.startswith("- ") and not line.startswith("- **"):
+                snippet = line[2:].strip()
+                if snippet:
+                    results.append(f"   {snippet[:300]}")
+
+        return "\n".join(results) if results else "搜索未找到相关结果"
 
     except Exception as e:
         return f"搜索出错: {e}"
+
+def tool_fetch_page(url: str) -> str:
+    """读取网页内容并提取正文"""
+    try:
+        # 如果是维基百科，用 API 直接取纯文本
+        if "wikipedia.org" in url:
+            title = url.split("/wiki/")[-1].split("#")[0]
+            from urllib.parse import quote as _q
+            netloc = _up.urlparse(url).netloc
+            api_url = (f"https://{netloc}/w/api.php"
+                       f"?action=query&prop=extracts&explaintext"
+                       f"&titles={_q(title)}&format=json&exchars=3000")
+            r = _req.Request(api_url, headers={"User-Agent": "Mozilla/5.0"})
+            with _req.urlopen(r, timeout=10) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            pages = data.get("query", {}).get("pages", {})
+            for pid, pdata in pages.items():
+                if pid != "-1" and "extract" in pdata:
+                    text = pdata["extract"].strip()
+                    if len(text) > 3000:
+                        text = text[:3000] + "\n\n...(截取)"
+                    return text if text else "页面无内容"
+
+        # 非维基百科：请求网页
+        r = _req.Request(url, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        })
+        with _req.urlopen(r, timeout=10) as resp:
+            html = resp.read().decode("utf-8", errors="replace")
+
+        # 提取 <p> 标签中的正文段落
+        paras = re.findall(
+            r'<p[^>]*>([^<]+(?:<[^/][^>]*>[^<]*</[^>]+>)?[^<]*)</p>',
+            html, re.DOTALL
+        )
+        if paras:
+            text = "\n".join(p.strip() for p in paras)
+            text = re.sub(r'<[^>]+>', '', text)
+            text = re.sub(r'\n{3,}', '\n\n', text).strip()
+        else:
+            text = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.DOTALL)
+            text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.DOTALL)
+            text = re.sub(r'<[^>]+>', '\n', text)
+            text = re.sub(r'\n[ \t]+\n', '\n', text)
+            text = re.sub(r'\n{3,}', '\n\n', text).strip()
+
+        if len(text) > 3000:
+            text = text[:3000] + "\n\n...(截取)"
+        return text if text else "页面无正文可提取"
+    except Exception as e:
+        return f"读取失败: {e}"
+
+def tool_summarize(text: str, max_sentences: int = 5) -> str:
+    """自动提取文本摘要（抽取式：取前几个关键句子）"""
+    if not text or len(text) < 20:
+        return "文本过短，无需摘要"
+
+    # 按句号、问号、感叹号、换行分割句子
+    sentences = re.split(r'[。！？\n]', text)
+    sentences = [s.strip() for s in sentences if len(s.strip()) > 10]
+
+    if not sentences:
+        return text[:500]
+
+    # 取前 max_sentences 个有内容的句子
+    summary = "。".join(sentences[:max_sentences]) + "。"
+    if len(summary) > 1000:
+        summary = summary[:1000] + "..."
+
+    return summary
+
+
+
 TOOL_REGISTRY = {
     "calculator": tool_calculator,
     "get_time": tool_get_time,
     "web_search": tool_web_search,
+    "fetch_page": tool_fetch_page,
+    "summarize": tool_summarize,
 }
 
 # 工具的 JSON 描述（发给 LLM 让它知道能调什么）
@@ -81,7 +188,7 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "web_search",
-            "description": "搜索互联网，获取实时信息",
+            "description": "搜索互联网新闻和网页，获取实时信息（基于AnySearch搜索引擎）",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -91,8 +198,8 @@ TOOL_DEFINITIONS = [
                     },
                     "max_results": {
                         "type": "integer",
-                        "description": "返回结果数量（默认5）"
-                    }
+                        "description": "返回结果数量，默认1条。用户明确说了数量才传更大值"
+                    },
                 },
                 "required": ["query"],
             },
@@ -121,6 +228,44 @@ TOOL_DEFINITIONS = [
             "name": "get_time",
             "description": "获取当前时间",
             "parameters": {"type": "object", "properties": {}},
+            },
+        },
+    {
+        "type": "function",
+        "function": {
+            "name": "fetch_page",
+            "description": "读取网页内容，输入URL返回正文文本",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "要读取的网页地址"
+                    }
+                },
+                "required": ["url"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "summarize",
+            "description": "自动提取文本摘要，输入长文本返回精简摘要",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "要总结的文本内容"
+                    },
+                    "max_sentences": {
+                        "type": "integer",
+                        "description": "摘要保留的句子数（默认5）"
+                    }
+                },
+                "required": ["text"],
+            },
         },
     },
 ]
@@ -180,15 +325,10 @@ def execute_tool_call(tool_call):
 # 第五步：ReAct Loop 主循环（核心！）
 # ============================================================
 def react_loop(user_query, max_steps=10):
-    system_prompt = """你是一个可以使用工具的 AI 助手。
-格式：
-THOUGHT: 分析问题，是否需要工具
-ACTION: 如果需要，调用工具
-OBSERVATION: 工具返回了什么
-THOUGHT: 继续推理
-FINAL ANSWER: 最终答案
-
-最终答案请用 FINAL ANSWER: 开头"""
+    system_prompt = """你是一个可以使用工具的 AI 助手。规则：
+1. 用 THOUGHT / ACTION / OBSERVATION / FINAL ANSWER 格式
+2. 最终答案用 FINAL ANSWER: 开头
+3. 搜索2次没结果就直接回答，不要继续搜"""
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -201,6 +341,7 @@ FINAL ANSWER: 最终答案
 
     no_tool_streak = 0      # 连续未调工具次数
     tools_were_used = False  # 上一步是否调了工具
+    search_count = 0         # 搜索次数限制
     for step in range(1, max_steps + 1):
         print(f"--- Step {step}/{max_steps} ---")
 
@@ -237,6 +378,21 @@ FINAL ANSWER: 最终答案
         # 记录这一轮调了工具，供下一轮判断
         tools_were_used = True
 
+        # (4) 限制搜索次数（最多3次）
+        for tc in tool_calls:
+            if tc["function"]["name"] == "web_search":
+                search_count += 1
+        if search_count >= 4:
+            # 搜索已超限，阻止搜索，让 LLM 用已有知识回答
+            for tc in tool_calls:
+                if tc["function"]["name"] == "web_search":
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc["id"],
+                        "content": "搜索次数已达上限，请基于已有知识和已获取的信息回答"
+                    })
+            continue
+
         # (4) 执行工具
         for tc in tool_calls:
             name = tc["function"]["name"]
@@ -262,10 +418,9 @@ FINAL ANSWER: 最终答案
 # ============================================================
 if __name__ == "__main__":
     tests = [
-        "现在几点了？",
-        "计算 (23 + 45) * 2 等于多少",
         "先告诉我时间，再计算 100 / 7",
         "搜索一下2026年AI Agent的最新发展",
+        "先搜索AI Agent的维基百科词条，打开第一条结果，然后总结内容（用中文）",
     ]
     for q in tests:
         react_loop(q)
