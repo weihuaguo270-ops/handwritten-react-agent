@@ -506,8 +506,11 @@ if __name__ == "__main__":
     else:
         print("\n" + "=" * 50)
         print("  Agent 交互模式已启动")
-        print("  输入 'exit' 或 '退出' 结束对话")
-        print("  输入 '记忆' 查看已保存的记忆")
+        print("  " + "=" * 50)
+        print("  可用工具：get_time / calculator / web_search / fetch_page / summarize")
+        print("  可问：时间、计算、搜索新闻、读网页、总结内容")
+        print("  记忆：说 \"记住...\" 保存信息，输入 '记忆' 查看")
+        print("  退出：输入 'exit' 或 '退出'")
         print("  " + "=" * 50 + "\n")
         
         first = True
