@@ -29,11 +29,13 @@
 
 ## 已实现工具
 
-| 工具名 | 功能 | 说明 |
-|--------|------|------|
-| `get_time()` | 获取当前时间 | 本地调用，无依赖 |
-| `calculator(expression)` | 计算数学表达式 | Python eval，安全校验 |
-| `web_search(query)` | 搜索维基百科 | 中文优先，英文兜底 |
+| 工具名 | 功能 | 数据源 |
+|--------|------|--------|
+| `get_time()` | 获取当前时间 | 本地调用 |
+| `calculator(expression)` | 计算数学表达式 | Python eval |
+| `web_search(query)` | 搜索互联网新闻 | AnySearch 搜索引擎 |
+| `fetch_page(url)` | 读取网页正文 | 维基API/HTML提取 |
+| `summarize(text)` | 自动提取摘要 | 抽取式 |
 
 ## 快速开始
 
