@@ -1,14 +1,63 @@
 # handwritten-react-agent
 
-手写 ReAct Agent — 零框架实现 LLM Agent 核心循环。
+手写 ReAct Agent — 零框架实现 LLM Agent 核心循环，支持交互模式、工具调用和语义记忆。
 
 ## 概述
 
-本项目从零实现 ReAct（Reasoning + Acting）循环，不依赖 LangChain、AutoGPT 等任何 Agent 框架，只用 Python 标准库 + LLM API。
+从零实现 ReAct（Reasoning + Acting）循环，不依赖 LangChain、AutoGPT 等框架，只用 Python 标准库 + LLM API + BGE Embedding。
 
-通过手写完整循环，深入理解 Agent 的核心机制：Thought → Action → Observation 的反馈闭环。
+## 快速开始
+
+### 1. 创建虚拟环境（推荐）
+
+```bash
+python -m venv venv
+venv\Scripts\python -m pip install numpy scikit-learn sentence-transformers
+```
+
+### 2. 配置 API Key
+
+修改 `react_loop.py` 顶部第 17 行：
+
+```python
+API_KEY=''your-key-here''
+BASE_URL = "https://api.deepseek.com"
+MODEL = "deepseek-v4-flash"
+```
+
+### 3. 运行
+
+```bash
+venv\Scripts\python react_loop.py
+```
+
+交互模式：
+
+```
+==================================================
+  Agent 交互模式已启动
+  ==================================================
+  可用工具：get_time / calculator / web_search / fetch_page / summarize
+  可问：时间、计算、搜索新闻、读网页、总结内容
+  记忆：说 "记住..." 保存信息，输入 '记忆' 查看
+  退出：输入 'exit' 或 '退出'
+  ==================================================
+
+你 > 记住我叫小明，学计算机的
+你 > 我学的什么专业？
+你 > 记忆
+你 > exit
+```
+
+单次运行：
+
+```bash
+venv\Scripts\python react_loop.py "现在几点了？"
+```
 
 ## 核心机制
+
+### ReAct Loop
 
 ```
 用户输入 → 调用 LLM → LLM 输出思考(Thought)
@@ -18,14 +67,14 @@
                       → 已足够信息？→ 输出最终答案(Final Answer)
 ```
 
-### ReAct vs CoT
+### 记忆系统
 
-| | Chain-of-Thought | ReAct |
-|---|---|---|
-| 信息来源 | 仅限训练数据 | 训练数据 + 外部工具 |
-| 能否获取新信息 | ❌ | ✅ |
-| 反馈闭环 | ❌ 单向推理 | ✅ 工具结果影响下一步 |
-| 适用场景 | 逻辑推理 | 需要操作外部的 Agent |
+基于 BGE-small-zh-v1.5 的语义记忆：
+
+- 说 `记住...` 保存信息 → BGE 模型转 512 维向量 → 持久化到 memory.json
+- 每次提问自动检索相关记忆（余弦相似度）→ 加入上下文
+- 启动时自动加载历史记忆
+- 查看记忆：输入 `'记忆'`
 
 ## 已实现工具
 
@@ -37,83 +86,49 @@
 | `fetch_page(url)` | 读取网页正文 | 维基API/HTML提取 |
 | `summarize(text)` | 自动提取摘要 | 抽取式 |
 
-## 快速开始
+### Pipeline 示例
 
-### 1. 配置 API Key
-
-修改 `react_loop.py` 顶部：
-
-```python
-API_KEY=***
-BASE_URL = "https://api.deepseek.com"
-MODEL = "deepseek-v4-flash"
+```
+用户: 搜索AI Agent的维基百科词条，打开第一条，总结内容
+  → web_search("AI Agent Wikipedia")       # 搜索
+  → fetch_page("en.wikipedia.org/...")     # 读全文
+  → summarize(全文)                         # 总结
+  → LLM 综合回答                             # 输出
 ```
 
-### 2. 运行
+## 自动化评测
 
 ```bash
-python react_loop.py
+venv\Scripts\python eval.py
 ```
 
-### 3. 测试用例
-
-当前内置 4 个测试：
-
-1. `现在几点了？` → 调 get_time
-2. `计算 (23 + 45) * 2` → 调 calculator
-3. `先告诉我时间，再计算 100 / 7` → 连续调两个工具
-4. `搜索一下2026年AI Agent的最新发展` → 多次搜索后汇总报告
-
-## 扩展新工具
-
-添加一个新工具只需三步：
-
-1. **写函数**：实现工具逻辑
-2. **注册**：加入 `TOOL_REGISTRY`
-3. **声明**：在 `TOOL_DEFINITIONS` 中添加 JSON 描述
+5 个测试用例，自动检查工具调用、内容完整性、步数。
 
 ## 项目结构
 
 ```
 handwritten-react-agent/
-├── react_loop.py          # 主代码（ReAct Loop + 工具实现）
+├── react_loop.py    # 主代码（ReAct Loop + 工具 + 记忆 + 交互模式）
+├── eval.py          # 自动化评测
+├── memory.json      # 记忆持久化（自动生成）
 ├── README.md
 └── LICENSE
 ```
 
+## 依赖
+
+- Python 3.8+
+- numpy
+- scikit-learn
+- sentence-transformers（首次加载约 13 秒）
+
 ## 后续计划
 
-- [ ] 交互式对话模式
-- [ ] 对话历史记忆
-- [ ] Agent Eval 评测框架
-- [ ] 更多工具
+- [ ] LLM 自动提取关键信息（无需手动说"记住"）
+- [ ] 记忆遗忘机制（Token 窗口管理）
+- [ ] MCP 协议支持
+- [ ] Web UI 界面
 
 ## License
 
 MIT
-
-
-## 自动化评测 (Eval)
-
-```bash
-python eval.py
-```
-
-5 个测试用例，自动检查：
-- 是否调用了正确的工具
-- 答案是否包含关键信息
-- 步数是否在合理范围内
-
-输出示例：
-```
-==================================================
-  Agent Eval 报告
-==================================================
-  [现在几点了？]
-    ✅ 工具: get_time
-    ✅ 内容: 包含关键信息
-    ✅ 步数: 1/10
-...
-  总分: 15/15
-==================================================
-```
