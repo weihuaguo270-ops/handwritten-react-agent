@@ -45,8 +45,8 @@ class Memory:
         with open(self.save_path, "w", encoding="utf-8") as f:
             json.dump({
                 "facts": self.facts,
-                "vecs": [v.tolist() for v in self.vecs],
-            }, f, ensure_ascii=False, indent=2)
+                "vecs": [[round(float(x), 4) for x in v] for v in self.vecs],
+            }, f, ensure_ascii=False, separators=(",", ":"))
     
     def add(self, fact):
         if fact not in self.facts:
