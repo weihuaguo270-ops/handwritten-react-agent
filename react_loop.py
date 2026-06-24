@@ -10,6 +10,51 @@ import re
 import time
 from urllib import request as req
 from urllib.error import URLError
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+
+# ============================================================
+# 记忆系统
+# ============================================================
+class Memory:
+    def __init__(self):
+        self.facts = []
+        self.vectorizer = None
+    
+    def add(self, fact):
+        if fact not in self.facts:
+            self.facts.append(fact)
+            self._rebuild_index()
+            return True
+        return False
+    
+    def _rebuild_index(self):
+        if self.facts:
+            self.vectorizer = TfidfVectorizer(analyzer='char', ngram_range=(2, 4))
+            self.vectors = self.vectorizer.fit_transform(self.facts)
+        else:
+            self.vectorizer = None
+            self.vectors = None
+    
+    def query(self, question, top_k=3):
+        if not self.facts or self.vectorizer is None:
+            return []
+        try:
+            q_vec = self.vectorizer.transform([question])
+            scores = cosine_similarity(q_vec, self.vectors)[0]
+            results = []
+            for idx in scores.argsort()[::-1][:top_k]:
+                if scores[idx] > 0.1:
+                    results.append({"fact": self.facts[idx], "score": float(scores[idx])})
+            return results
+        except:
+            return []
+
+
+MEMORY = Memory()
+
 
 # ============================================================
 # 第一步：配置（换成你的 API Key 和地址）
@@ -416,16 +461,74 @@ def react_loop(user_query, max_steps=10):
 # ============================================================
 # 运行测试
 # ============================================================
+
+
 if __name__ == "__main__":
     import sys as _sys
+    
     if len(_sys.argv) > 1:
-        tests = [_sys.argv[1]]
+        q = _sys.argv[1]
+        memories = MEMORY.query(q)
+        memory_context = ""
+        if memories:
+            memory_context = "\n[来自记忆]\n"
+            for m in memories:
+                memory_context += f"  - {m['fact']}\n"
+        try:
+            react_loop(memory_context + q)
+        except Exception as e:
+            print(f"[错误] {e}")
+        if "记住" in q:
+            fact = q.split("记住", 1)[1].strip()
+            if fact:
+                MEMORY.add(fact)
+                print(f"\n[记忆] 已记住: {fact}")
+    
     else:
-        tests = [
-        "先告诉我时间，再计算 100 / 7",
-        "搜索一下2026年AI Agent的最新发展",
-        "先搜索AI Agent的维基百科词条，打开第一条结果，然后总结内容（用中文）",
-    ]
-    for q in tests:
-        react_loop(q)
-        print("\n")
+        print("\n" + "=" * 50)
+        print("  Agent 交互模式已启动")
+        print("  输入 'exit' 或 '退出' 结束对话")
+        print("  输入 '记忆' 查看已保存的记忆")
+        print("  " + "=" * 50 + "\n")
+        
+        first = True
+        while True:
+            if first:
+                q = input("你 > ")
+                first = False
+            else:
+                q = input("\n你 > ")
+            
+            if q.lower() in ("exit", "退出", "quit"):
+                print("再见！")
+                break
+            
+            if q == "记忆":
+                print("\n已保存的记忆:")
+                if MEMORY.facts:
+                    for i, fact in enumerate(MEMORY.facts, 1):
+                        print(f"  {i}. {fact}")
+                else:
+                    print("  （无）")
+                continue
+            
+            memories = MEMORY.query(q)
+            memory_context = ""
+            if memories:
+                memory_context = "\n[来自记忆]\n"
+                for m in memories:
+                    memory_context += f"  - {m['fact']}\n"
+            
+            try:
+                if memory_context:
+                    react_loop(memory_context + q)
+                else:
+                    react_loop(q)
+            except Exception as e:
+                print(f"[错误] {e}")
+            
+            if "记住" in q:
+                fact = q.split("记住", 1)[1].strip()
+                if fact and MEMORY.add(fact):
+                    print(f"\n[记忆] 已记住: {fact}")
+                    print(f"[记忆] 当前共 {len(MEMORY.facts)} 条")
