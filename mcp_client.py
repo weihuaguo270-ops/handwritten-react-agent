@@ -42,7 +42,6 @@ class MCPClient:
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
             env=env,
         )
         resp = self._rpc("initialize", {
@@ -122,13 +121,15 @@ class MCPClient:
             "id": self._req_id,
         }
         line = json.dumps(req) + "\n"
-        self.proc.stdin.write(line)
+        self.proc.stdin.write(line.encode("utf-8"))
         self.proc.stdin.flush()
 
         resp_line = self.proc.stdout.readline()
         if not resp_line:
             raise RuntimeError("MCP Server 连接断开")
+        resp_line = resp_line.decode("utf-8")
         resp = json.loads(resp_line)
+
 
         if "error" in resp:
             e = resp["error"]
@@ -138,7 +139,7 @@ class MCPClient:
     def _notify(self, method, params=None):
         req = {"jsonrpc": "2.0", "method": method, "params": params or {}}
         line = json.dumps(req) + "\n"
-        self.proc.stdin.write(line)
+        self.proc.stdin.write(line.encode("utf-8"))
         self.proc.stdin.flush()
 
 

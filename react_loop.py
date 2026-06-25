@@ -5,9 +5,10 @@
 理解这个代码 = 理解了 Agent 最核心的机制
 """
 
+
 import sys
 import os
-# 确保能找到同目录的 mcp_client.py
+# ensure mcp_client.py can be found
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import json
@@ -21,6 +22,20 @@ from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 import os as _os
 from mcp_client import MCPClient
+MCP_CLIENTS = []
+
+DEFAULT_MCP_SERVERS = [
+    ["uvx", "mcp-server-time"],
+    ["C:/Program Files/nodejs/npx.cmd", "-y", "@modelcontextprotocol/server-filesystem", "D:/agent_learning/repo"],
+]
+
+# 默认 MCP 服务器列表（没有 --mcp 参数时自动加载）
+# 格式: ["命令", "参数1", "参数2", ...]
+DEFAULT_MCP_SERVERS = [
+    ["uvx", "mcp-server-time"],
+    # 取消注释下一行可启用文件系统 Server：
+    ["C:/Program Files/nodejs/npx.cmd", "-y", "@modelcontextprotocol/server-filesystem", "D:/agent_learning/repo"],
+]
 _os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
 
 
@@ -74,7 +89,7 @@ class Memory:
             scores = cosine_similarity([q_vec], self.vecs)[0]
             results = []
             for idx in scores.argsort()[::-1][:top_k]:
-                if scores[idx] > 0.15:
+                if scores[idx] > 0.5:
                     results.append({"fact": self.facts[idx], "score": float(scores[idx])})
             return results
         except Exception:
@@ -87,7 +102,6 @@ MEMORY = Memory()
 
 
 # 全局 MCP 客户端实例（默认 None，启动时通过参数初始化）
-MCP_CLIENT = None
 
 
 # ============================================================
@@ -255,8 +269,8 @@ def tool_summarize(text: str, max_sentences: int = 5) -> str:
 
 
 TOOL_REGISTRY = {
-    "calculator": tool_calculator,
     "get_time": tool_get_time,
+    "calculator": tool_calculator,
     "web_search": tool_web_search,
     "fetch_page": tool_fetch_page,
     "summarize": tool_summarize,
@@ -302,14 +316,6 @@ TOOL_DEFINITIONS = [
             },
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_time",
-            "description": "获取当前时间",
-            "parameters": {"type": "object", "properties": {}},
-            },
-        },
     {
         "type": "function",
         "function": {
@@ -400,14 +406,14 @@ def execute_tool_call(tool_call):
             return str(TOOL_REGISTRY[func_name](**arguments))
         except Exception as e:
             return json.dumps({"error": f"执行错误: {e}"})
-    # 不在本地注册表 → 尝试 MCP 工具
-    if MCP_CLIENT is not None:
-        try:
-            print(f"  [MCP] 转发: {func_name}({json.dumps(arguments, ensure_ascii=False)[:100]})")
-            result = MCP_CLIENT.call_tool(func_name, arguments)
-            return result
-        except Exception as e:
-            return json.dumps({"error": f"MCP调用失败: {e}"})
+    # 不在本地注册表 → 尝试遍历所有 MCP Client
+    for _mcp_client in MCP_CLIENTS:
+        if func_name in [t["name"] for t in _mcp_client.tools]:
+            try:
+                print(f"  [MCP] 转发: {func_name}({json.dumps(arguments, ensure_ascii=False)[:100]})")
+                return _mcp_client.call_tool(func_name, arguments)
+            except Exception as e:
+                return json.dumps({"error": f"MCP调用失败: {e}"})
     return json.dumps({"error": f"未知工具: {func_name}"})
 
 # ============================================================
@@ -417,7 +423,8 @@ def react_loop(user_query, max_steps=10):
     system_prompt = """你是一个可以使用工具的 AI 助手。规则：
 1. 用 THOUGHT / ACTION / OBSERVATION / FINAL ANSWER 格式
 2. 最终答案用 FINAL ANSWER: 开头
-3. 搜索2次没结果就直接回答，不要继续搜"""
+3. 根据用户问题选择最合适的工具——包括本地工具和 MCP 远程工具
+4. 搜索2次没结果就直接回答，不要继续搜"""
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -428,17 +435,17 @@ def react_loop(user_query, max_steps=10):
     print(f"用户: {user_query}")
     print(f"{'='*60}\n")
 
-    no_tool_streak = 0      # 连续未调工具次数
-    tools_were_used = False  # 上一步是否调了工具
-    search_count = 0         # 搜索次数限制
+    last_content = ""
+    tools_were_used = False
+    search_count = 0
     for step in range(1, max_steps + 1):
         print(f"--- Step {step}/{max_steps} ---")
 
         # (1) 调 LLM
         msg = call_llm(messages)
-        content = msg.get("content", "") or ""
-        if content.strip():
-            print(f"[LLM思考] {content[:200]}")
+        last_content = msg.get("content", "") or ""
+        if last_content.strip():
+            print(f"[LLM思考] {last_content[:200]}")
 
         # (2) LLM 回复加入对话历史
         messages.append(msg)
@@ -447,51 +454,43 @@ def react_loop(user_query, max_steps=10):
         tool_calls = msg.get("tool_calls", [])
 
         if not tool_calls:
-            # LLM 没调工具 -> 可能给出了最终答案
-            if "FINAL ANSWER:" in content.upper():
-                final = content.split("FINAL ANSWER:", 1)[1].strip()
+            # 检查是否有最终答案标记
+            if "FINAL ANSWER:" in last_content.upper():
+                final = last_content.split("FINAL ANSWER:", 1)[1].strip()
                 print(f"\n>>> 最终答案: {final}")
                 return final
-            # 如果上一步调用了工具、这一步没有调工具
-            # 说明 LLM 正在根据工具结果给出回答 -> 返回这个回答
-            if tools_were_used:
-                print(f"\n>>> 最终答案: {content.strip()}")
-                return content
-            # 如果 LLM 两轮都没调工具 -> 可能是寒暄或空转 -> 也结束
-            no_tool_streak += 1
-            if no_tool_streak >= 2:
-                print(f"\n(LLM 连续 {no_tool_streak} 轮未调工具，停止)")
-                return content
-            continue  # 继续下一轮
-
-        # 记录这一轮调了工具，供下一轮判断
-        tools_were_used = True
-
-        # (4) 限制搜索次数（最多3次）
-        for tc in tool_calls:
-            if tc["function"]["name"] == "web_search":
-                search_count += 1
-        if search_count >= 4:
-            # 搜索已超限，阻止搜索，让 LLM 用已有知识回答
-            for tc in tool_calls:
-                if tc["function"]["name"] == "web_search":
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tc["id"],
-                        "content": "搜索次数已达上限，请基于已有知识和已获取的信息回答"
-                    })
+            # 上一步用了工具，这一步没调但给出了实质内容 → 作为答案
+            if tools_were_used and len(last_content.strip()) > 10:
+                print(f"\n>>> 最终答案: {last_content.strip()}")
+                return last_content
+            # 连续 4 步寒暄（没调工具也不是明确答案）→ 结束
+            if not tools_were_used and len(last_content.strip()) > 5 and step >= 4:
+                print(f"\n(连续 {step} 步寒暄未调用工具，自动结束)")
+                return last_content
             continue
 
-        # (4) 执行工具
+        # 执行工具
+        tools_were_used = True
         for tc in tool_calls:
             name = tc["function"]["name"]
             args = tc["function"]["arguments"]
             print(f"[调工具] {name}({args})")
 
+            # 搜索次数限制（只阻止搜索，不影响其他工具）
+            if name == "web_search":
+                search_count += 1
+                if search_count >= 4:
+                    print(f"  (搜索已达上限，跳过)")
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc["id"],
+                        "content": "搜索已达上限，请基于已有信息回答"
+                    })
+                    continue
+
             result = execute_tool_call(tc)
             print(f"[工具返回] {result[:100]}")
 
-            # 关键：工具结果作为 Observation 加回对话
             messages.append({
                 "role": "tool",
                 "tool_call_id": tc["id"],
@@ -499,8 +498,9 @@ def react_loop(user_query, max_steps=10):
             })
 
     print(f"\n(达到最大步骤 {max_steps}，停止)")
-    print(f">>> 最终答案: {content.strip()}")
-    return content
+    if last_content.strip():
+        print(f">>> 最终答案: {last_content.strip()}")
+    return last_content
 
 # ============================================================
 # 运行测试
@@ -512,40 +512,40 @@ if __name__ == "__main__":
     
     # 解析 --mcp 参数：python react_loop.py --mcp uvx mcp-server-time
     _sys_argv = _sys.argv[1:]
-    _mcp_args = None
-    if "--mcp" in _sys_argv:
+    _mcp_args_list = []
+    while "--mcp" in _sys_argv:
         idx = _sys_argv.index("--mcp")
-        # --mcp 后面紧跟一个引号包裹的命令串，如 "uvx mcp-server-time"
         if idx + 1 < len(_sys_argv):
-            _mcp_str = _sys_argv[idx + 1]   # 取命令串
-            _mcp_args = _mcp_str.split()    # 拆成 command + args
-        _sys_argv = _sys_argv[:idx] + _sys_argv[idx + 2:]  # 移除 --mcp 及其参数
-    
-    # 如果指定了 MCP，启动连接并发现工具
-    if _mcp_args:
-        # (模块级作用域，无需 global 声明)
-        cmd = _mcp_args[0]
-        args = _mcp_args[1:]
-        print(f"\n[MCP] 连接服务器: {cmd} {' '.join(args)}")
-        try:
-            MCP_CLIENT = MCPClient(cmd, args)
-            MCP_CLIENT.connect()
-            mcp_tools = MCP_CLIENT.discover_tools()
-            mcp_defs = MCP_CLIENT.to_tool_definitions()
-            TOOL_DEFINITIONS.extend(mcp_defs)
-            print(f"[MCP] 合并了 {len(mcp_defs)} 个 MCP 工具到 TOOL_DEFINITIONS\n")
-        except Exception as e:
-            print(f"[MCP] 连接失败: {e}\n")
-            MCP_CLIENT = None
+            _mcp_args_list.append(_sys_argv[idx + 1].split())
+        _sys_argv = _sys_argv[:idx] + _sys_argv[idx + 2:]
+
+    # 逐个连接 MCP Server
+    for mcp_args in _mcp_args_list:
+            cmd = mcp_args[0]
+            args = mcp_args[1:]
+            print(f"\n[MCP] 连接: {cmd} {' '.join(args)}")
+            try:
+                client = MCPClient(cmd, args)
+                client.connect()
+                client.discover_tools()
+                mcp_defs = client.to_tool_definitions()
+                # MCP 连上后隐藏被取代的本地工具
+                _suppress = {"get_time"}  # get_time → MCP get_current_time
+                TOOL_DEFINITIONS = [t for t in TOOL_DEFINITIONS 
+                                   if t["function"]["name"] not in _suppress]
+                TOOL_DEFINITIONS.extend(mcp_defs)
+                MCP_CLIENTS.append(client)
+                print(f"  -> 隐藏本地重复工具，合并 {len(mcp_defs)} 个 MCP 工具")
+            except Exception as e:
+                print(f"  -> 连接失败: {e}\n")
     
     if _sys_argv:
         q = " ".join(_sys_argv)
         memories = MEMORY.query(q)
         memory_context = ""
         if memories:
-            memory_context = "\n[来自记忆]\n"
-            for m in memories:
-                memory_context += f"  - {m['fact']}\n"
+            # 不显示记忆标签，直接拼接（高阈值保证了内容相关）
+            memory_context = "\n".join([f"（相关记忆：{m['fact']}）" for m in memories])
         try:
             react_loop(memory_context + q)
         except Exception as e:
@@ -559,16 +559,18 @@ if __name__ == "__main__":
     else:
         # 交互模式可用工具列表（动态包含 MCP 工具）
         tool_list = " / ".join(list(TOOL_REGISTRY.keys()))
-        if MCP_CLIENT:
-            mcp_names = [t["name"] for t in MCP_CLIENT.tools]
+        _total_mcp = 0
+        for _c in MCP_CLIENTS:
+            mcp_names = [t["name"] for t in _c.tools]
             tool_list += " / " + " / ".join(mcp_names)
+            _total_mcp += len(_c.tools)
         
         print("\n" + "=" * 50)
         print("  Agent 交互模式已启动")
         print("  " + "=" * 50)
         print(f"  可用工具：{tool_list}")
-        if MCP_CLIENT:
-            print(f"  MCP 已连接: {len(MCP_CLIENT.tools)} 个远程工具可用")
+        if MCP_CLIENTS:
+            print(f"  MCP 已连接 {len(MCP_CLIENTS)} 个 Server，共 {_total_mcp} 个远程工具")
         print("  可问：时间、计算、搜索新闻、读网页、总结内容")
         print("  记忆：说 \"记住...\" 保存信息，输入 '记忆' 查看")
         print("  退出：输入 'exit' 或 '退出'")
@@ -585,6 +587,12 @@ if __name__ == "__main__":
             if q.lower() in ("exit", "退出", "quit"):
                 print("再见！")
                 break
+            
+            if not q.strip():
+                continue
+            
+            if not q.strip():
+                continue
             
             if q == "记忆":
                 print("\n已保存的记忆:")
