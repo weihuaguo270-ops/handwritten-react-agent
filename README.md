@@ -160,6 +160,46 @@ handwritten-react-agent/
 [汇总结果]    → 整合答案
 ```
 
+### Worker 隔离
+
+每个 Worker 只能看到自己需要的工具，避免 LLM 选错：
+
+| 子任务 | 暴露的工具数 | 可用的工具 |
+|--------|------------|-----------|
+| 查询纽约时间 | 4/20 | get_current_time, convert_time, web_search, fetch_page |
+| 查看文件大小 | 10/20 | read_text_file, write_file, list_directory, get_file_info ... |
+
+分类规则（关键词匹配，无需额外 LLM 调用）：
+
+| 分类 | 触发关键词 | 包含工具 |
+|------|-----------|---------|
+| time | 时间、时区、当前时间、纽约 | get_current_time, convert_time |
+| file | 文件、目录、大小、读写 | 全部 filesystem 工具 |
+| web | 搜索、网页、新闻、查询 | web_search, fetch_page |
+| calc | 计算、数学 | calculator |
+| summary | 总结、摘要、概括 | summarize |
+
+### 并行执行
+
+默认串行执行 Worker。加 `--parallel` 启用并行：
+
+```bash
+# 串行（默认）
+python react_loop.py "现在纽约几点？同时看看文件大小"
+
+# 并行
+python react_loop.py --parallel "现在纽约几点？同时看看文件大小"
+```
+
+并行耗时对比（2 个 Worker）：
+
+| 方式 | 耗时 | 提升 |
+|------|------|------|
+| 串行 | 33s | - |
+| 并行 | 24s | 27% |
+
+实现：`concurrent.futures.ThreadPoolExecutor`，每个 Worker 独立线程 + 独立工具快照。
+
 ### 触发条件
 
 用户问题含"同时"、"并且"、"还有"、"另外"、"且"等连接词时自动启用。
