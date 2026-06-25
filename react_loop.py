@@ -37,10 +37,14 @@ _os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
 # 记忆系统
 # ============================================================
 class Memory:
+    MAX_FACTS = 100  # 记忆最大条数，超过自动遗忘
+
     def __init__(self, save_path=r"D:\agent_learning\memory.json"):
         self.save_path = save_path
         self.facts = []
         self.vecs = []
+        self.access_count = []   # 访问次数
+        self.last_access = []    # 最后访问时间戳
         self.model = SentenceTransformer('BAAI/bge-small-zh-v1.5')
         self._load()
     
@@ -52,10 +56,14 @@ class Memory:
             self.facts = data.get("facts", [])
             import numpy as np
             self.vecs = [np.array(v) for v in data.get("vecs", [])]
+            self.access_count = data.get("access_count", [0] * len(self.facts))
+            self.last_access = data.get("last_access", [0] * len(self.facts))
             print(f"[记忆] 已加载 {len(self.facts)} 条记忆")
         except:
             self.facts = []
             self.vecs = []
+            self.access_count = []
+            self.last_access = []
     
     def _save(self):
         import json
@@ -64,6 +72,8 @@ class Memory:
             json.dump({
                 "facts": self.facts,
                 "vecs": [[round(float(x), 4) for x in v] for v in self.vecs],
+                "access_count": self.access_count,
+                "last_access": self.last_access,
             }, f, ensure_ascii=False, separators=(",", ":"))
     
     def add(self, fact):
@@ -71,6 +81,9 @@ class Memory:
             self.facts.append(fact)
             vec = self.model.encode(fact)
             self.vecs.append(vec)
+            self.access_count.append(0)
+            self.last_access.append(0)
+            self._prune()  # 超过上限自动遗忘
             self._save()
             return True
         return False
@@ -83,11 +96,115 @@ class Memory:
             scores = cosine_similarity([q_vec], self.vecs)[0]
             results = []
             for idx in scores.argsort()[::-1][:top_k]:
-                if scores[idx] > 0.5:
+                if scores[idx] > 0.3:
                     results.append({"fact": self.facts[idx], "score": float(scores[idx])})
+                    self.access_count[idx] += 1           # 记一次使用
+                    self.last_access[idx] = __import__("time").time()
+            if results:
+                self._save()
             return results
         except Exception:
             return []
+    
+    def remove(self, fact_or_query):
+        """删除记忆：精确匹配 → 关键词包含 → 语义匹配"""
+        # 1) 精确匹配
+        if fact_or_query in self.facts:
+            self._remove_at(self.facts.index(fact_or_query))
+            self._save()
+            return 1
+        
+        # 2) 关键词包含匹配
+        for i, f in enumerate(self.facts):
+            if fact_or_query in f:
+                self._remove_at(i)
+                self._save()
+                print(f"[记忆] 已删除: {f}")
+                return 1
+        
+        # 3) 语义匹配
+        try:
+            q_vec = self.model.encode(fact_or_query)
+            scores = cosine_similarity([q_vec], self.vecs)[0]
+            best = scores.argsort()[::-1][0]
+            if scores[best] > 0.4:
+                self._remove_at(best)
+                self._save()
+                print(f"[记忆] 已删除: {self.facts[best]}")
+                return 1
+        except:
+            pass
+        return 0
+    
+    def _remove_at(self, idx):
+        """删除指定索引的记忆"""
+        self.facts.pop(idx)
+        self.vecs.pop(idx)
+        self.access_count.pop(idx)
+        self.last_access.pop(idx)
+    
+    def _prune(self):
+        """超过上限时，自动遗忘最不常用的记忆"""
+        while len(self.facts) > self.MAX_FACTS:
+            # 按 (访问次数, 最后访问时间) 排序，移除最不常用的
+            scores = []
+            now = __import__("time").time()
+            for i in range(len(self.facts)):
+                count = self.access_count[i]
+                age = now - self.last_access[i] if self.last_access[i] > 0 else 999999
+                scores.append((count, -age, i))  # 访问少、时间久的优先移除
+            scores.sort()
+            idx = scores[0][2]
+            removed = self.facts[idx]
+            self._remove_at(idx)
+            print(f"[记忆] 自动遗忘: {removed}")
+    
+    def clear(self):
+        """清空所有记忆"""
+        self.facts.clear()
+        self.vecs.clear()
+        self.access_count.clear()
+        self.last_access.clear()
+        self._save()
+
+    def auto_extract(self, user_query, assistant_answer):
+        """从对话中自动提取值得记住的信息"""
+        if not assistant_answer or len(assistant_answer) < 20 or any(w in user_query for w in ["忘记", "删除"]):
+            return 0
+        
+        prompt = (
+            "从以下对话中提取**具体的事实性信息**。\n"
+            "规则：\n"
+            "- 提取具体信息，如姓名、职业、爱好、背景、联系方式等\n"
+            "- 每个事实单独一行，格式如: 用户的姓名是张三\n"
+            "- 忽略闲聊、问候、临时问题\n"
+            "- 如果用户明确告知个人信息，务必提取\n"
+            "- 没有任何具体事实就输出空行\n\n"
+            f"用户: {user_query}\n\n"
+            f"助手: {assistant_answer}\n\n"
+            "事实:"
+        )
+        
+        msg = call_llm([
+            {"role": "system", "content": "你是一个信息提取助手。从对话中提取值得记住的事实。"},
+            {"role": "user", "content": prompt},
+        ])
+        
+        raw = msg.get("content", "") or ""
+        # 如果 LLM 报错了，不存
+        if raw.startswith("LLM失败") or raw.startswith("解析失败"):
+            return 0
+        
+        facts = [f.strip() for f in raw.split("\n") if f.strip()]
+        saved = 0
+        for fact in facts:
+            # 过滤：太短的、包含特殊标记的、错误信息的不要
+            if len(fact) > 5 and not any(w in fact for w in ["LLM失败", "错误", "抱歉", "值得记住", "信息:", "没有提供", "没有任何", "事实:", "个人信息"]):
+                if self.add(fact):
+                    saved += 1
+        if saved > 0:
+            print(f"[记忆] 自动记忆: 保存了 {saved} 条新信息")
+        return saved
 
 
 MEMORY = Memory()
@@ -542,20 +659,39 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"  -> 连接失败: {e}\n")
 
+    _skip_query = False
     if _sys_argv:
         q = " ".join(_sys_argv)
-        memories = MEMORY.query(q)
-        memory_context = ""
-        if memories:
-            memory_context = "\n".join([f"（相关记忆：{m['fact']}）" for m in memories])
+        # 处理"忘记/删除"——直接删，不走 react_loop
+        if "忘记" in q or "删除" in q:
+            target = q.split("忘记", 1)[1].strip() if "忘记" in q else q.split("删除", 1)[1].strip()
+            if "所有" in target or "全部" in target:
+                MEMORY.clear()
+                print("\n[记忆] 已清空所有记忆")
+            elif target:
+                n = MEMORY.remove(target)
+                if n > 0:
+                    print(f"\n[记忆] 已删除相关记忆")
+                else:
+                    print(f"\n[记忆] 未找到匹配的记忆")
+            _skip_query = True
+        
+        if not _skip_query:
+            memories = MEMORY.query(q)
+            memory_context = ""
+            if memories:
+                memory_context = "\n".join([f"（相关记忆：{m['fact']}）" for m in memories])
         try:
-            full_q = memory_context + q if memory_context else q
+            full_q = memory_context + q if memory_context and not _skip_query else q
             if any(w in q for w in ["同时", "并且", "还有", "另外", "且"]):
-                multi_agent_chain(full_q, parallel=_parallel_mode)
+                result = multi_agent_chain(full_q, parallel=_parallel_mode)
             else:
-                react_loop(full_q)
+                result = react_loop(full_q)
+            if result:
+                MEMORY.auto_extract(q, result)
         except Exception as e:
             import traceback; traceback.print_exc()
+        
         if "记住" in q:
             fact = q.split("记住", 1)[1].strip().lstrip(" ，,、。.：:")
             if fact:
@@ -596,11 +732,26 @@ if __name__ == "__main__":
             try:
                 full_q = memory_context + q if memory_context else q
                 if any(w in q for w in ["同时", "并且", "还有", "另外", "且"]):
-                    multi_agent_chain(full_q)
+                    result = multi_agent_chain(full_q)
                 else:
-                    react_loop(full_q)
+                    result = react_loop(full_q)
+                if result:
+                    MEMORY.auto_extract(q, result)
             except Exception as e:
                 import traceback; traceback.print_exc()
+            if "忘记" in q or "删除" in q:
+                target = q.split("忘记", 1)[1].strip() if "忘记" in q else q.split("删除", 1)[1].strip()
+                if "所有" in target or "全部" in target:
+                    MEMORY.clear()
+                    print("\n[记忆] 已清空所有记忆")
+                elif target:
+                    n = MEMORY.remove(target)
+                    if n > 0:
+                        print(f"\n[记忆] 已删除相关记忆")
+                    else:
+                        print(f"\n[记忆] 未找到匹配的记忆")
+                continue  # 直接下一轮
+            
             if "记住" in q:
                 fact = q.split("记住", 1)[1].strip().lstrip(" ，,、。.：:")
                 if fact and MEMORY.add(fact):
