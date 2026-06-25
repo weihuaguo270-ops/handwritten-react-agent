@@ -26,13 +26,6 @@ MCP_CLIENTS = []
 
 DEFAULT_MCP_SERVERS = [
     ["uvx", "mcp-server-time"],
-    ["C:/Program Files/nodejs/npx.cmd", "-y", "@modelcontextprotocol/server-filesystem", "D:/agent_learning/repo"],
-]
-
-# 默认 MCP 服务器列表（没有 --mcp 参数时自动加载）
-# 格式: ["命令", "参数1", "参数2", ...]
-DEFAULT_MCP_SERVERS = [
-    ["uvx", "mcp-server-time"],
     # 取消注释下一行可启用文件系统 Server：
     ["C:/Program Files/nodejs/npx.cmd", "-y", "@modelcontextprotocol/server-filesystem", "D:/agent_learning/repo"],
 ]
@@ -507,7 +500,84 @@ def react_loop(user_query, max_steps=10):
 # ============================================================
 
 
-if __name__ == "__main__":
+
+# ============================================================
+# 多 Agent 协作（Orchestrator-Worker 链式调用）
+# ============================================================
+def multi_agent_chain(user_query):
+    """
+    Orchestrator-Worker 模式：
+    1. Orchestrator 将用户问题拆成独立子任务
+    2. 每个子任务由一个 Worker（独立 ReAct Loop）执行
+    3. 汇总所有 Worker 结果
+    """
+    # ---------- 1. Orchestrator 拆任务 ----------
+    decompose_prompt = (
+        "将以下请求拆成独立子任务。要求：\n"
+        "- 每个子任务一句话，只做一件事\n"
+        "- 每行一个子任务，不要编号，不要标题\n"
+        "- 不要解释，直接输出任务\n\n"
+        "例子：\n"
+        "请求: 现在纽约几点？同时看看mcp_client.py大小\n"
+        "输出:\n"
+        "查询纽约的当前时间\n"
+        "查看D:\\agent_learning\\repo\\mcp_client.py的文件大小\n\n"
+        f"请求: {user_query}\n"
+        "输出:"
+    )
+
+    msg = call_llm([
+        {"role": "system", "content": "你是一个任务分解助手。将多步请求拆成独立的单步子任务。"},
+        {"role": "user", "content": decompose_prompt},
+    ])
+
+    tasks = [t.strip() for t in (msg.get("content", "") or "").split("\n") if t.strip()]
+    print(f"\n[Orchestrator] 拆分为 {len(tasks)} 个子任务:")
+    for i, t in enumerate(tasks, 1):
+        print(f"  {i}. {t}")
+
+    # ---------- 2. Workers 依次执行 ----------
+    results = []
+    for i, task in enumerate(tasks, 1):
+        print(f"\n{'='*50}")
+        print(f"[Worker {i}/{len(tasks)}] {task}")
+        print(f"{'='*50}")
+        result = react_loop(task)
+        results.append(f"[任务{i}] {task}\n{result}")
+
+    # ---------- 3. Orchestrator 汇总 ----------
+    # 如果只有 1 个任务，直接返回结果
+    if len(results) == 1:
+        final = results[0].split("\n", 1)[1] if "\n" in results[0] else results[0]
+        print(f"\n{'='*50}")
+        print("[汇总结果]")
+        print(final)
+        return final
+    
+    # 多个任务 - 让 LLM 合并
+    summary_prompt = (
+        f"整合以下结果，回答用户问题：\n"
+        f"问题: {user_query}\n\n"
+        "\n".join(results) + "\n"
+    )
+
+    final_msg = call_llm([
+        {"role": "system", "content": "你是一个汇总助手。简洁地整合多个结果。"},
+        {"role": "user", "content": summary_prompt},
+    ])
+
+    final = final_msg.get("content", "") or ""
+    # 如果 LLM 没返回，直接用原始结果拼接
+    if not final.strip():
+        final = "\n".join(r.split("\n", 1)[1] if "\n" in r else r for r in results)
+    
+    print(f"\n{'='*50}")
+    print("[汇总结果]")
+    print(final)
+    return final
+
+
+
     import sys as _sys
     
     # 解析 --mcp 参数：python react_loop.py --mcp uvx mcp-server-time
@@ -520,10 +590,14 @@ if __name__ == "__main__":
         _sys_argv = _sys_argv[:idx] + _sys_argv[idx + 2:]
 
     # 逐个连接 MCP Server
+
+    if not _mcp_args_list:
+        _mcp_args_list = DEFAULT_MCP_SERVERS
+
     for mcp_args in _mcp_args_list:
             cmd = mcp_args[0]
             args = mcp_args[1:]
-            print(f"\n[MCP] 连接: {cmd} {' '.join(args)}")
+            print("  [MCP] connect")
             try:
                 client = MCPClient(cmd, args)
                 client.connect()
@@ -539,9 +613,11 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"  -> 连接失败: {e}\n")
     
+    print(f"[debug] _sys_argv={_sys_argv}")
     if _sys_argv:
         q = " ".join(_sys_argv)
         memories = MEMORY.query(q)
+        print(f"[debug] query={q}")
         memory_context = ""
         if memories:
             # 不显示记忆标签，直接拼接（高阈值保证了内容相关）
@@ -591,9 +667,6 @@ if __name__ == "__main__":
             if not q.strip():
                 continue
             
-            if not q.strip():
-                continue
-            
             if q == "记忆":
                 print("\n已保存的记忆:")
                 if MEMORY.facts:
@@ -611,13 +684,108 @@ if __name__ == "__main__":
                     memory_context += f"  - {m['fact']}\n"
             
             try:
-                if memory_context:
-                    react_loop(memory_context + q)
+                full_q = memory_context + q if memory_context else q
+                if any(w in q for w in ["同时", "并且", "还有", "另外", "且"]):
+                    multi_agent_chain(full_q)
                 else:
-                    react_loop(q)
+                    react_loop(full_q)
             except Exception as e:
                 print(f"[错误] {e}")
             
+            if "记住" in q:
+                fact = q.split("记住", 1)[1].strip().lstrip(" ，,、。.：:")
+                if fact and MEMORY.add(fact):
+                    print(f"\n[记忆] 已记住: {fact}")
+                    print(f"[记忆] 当前共 {len(MEMORY.facts)} 条")
+
+
+if __name__ == "__main__":
+    import sys as _sys
+    _sys_argv = _sys.argv[1:]
+    _mcp_args_list = []
+    while "--mcp" in _sys_argv:
+        idx = _sys_argv.index("--mcp")
+        if idx + 1 < len(_sys_argv):
+            _mcp_args_list.append(_sys_argv[idx + 1].split())
+        _sys_argv = _sys_argv[:idx] + _sys_argv[idx + 2:]
+    if not _mcp_args_list:
+        _mcp_args_list = DEFAULT_MCP_SERVERS
+    for mcp_args in _mcp_args_list:
+        cmd = mcp_args[0]
+        args = mcp_args[1:]
+        print("  [MCP] connect")
+        try:
+            client = MCPClient(cmd, args)
+            client.connect()
+            client.discover_tools()
+            mcp_defs = client.to_tool_definitions()
+            _suppress = {"get_time"}
+            TOOL_DEFINITIONS = [t for t in TOOL_DEFINITIONS if t["function"]["name"] not in _suppress]
+            TOOL_DEFINITIONS.extend(mcp_defs)
+            MCP_CLIENTS.append(client)
+            print(f"  -> 隐藏本地重复工具，合并 {len(mcp_defs)} 个 MCP 工具")
+        except Exception as e:
+            print(f"  -> 连接失败: {e}\n")
+
+    if _sys_argv:
+        q = " ".join(_sys_argv)
+        memories = MEMORY.query(q)
+        memory_context = ""
+        if memories:
+            memory_context = "\n".join([f"（相关记忆：{m['fact']}）" for m in memories])
+        try:
+            full_q = memory_context + q if memory_context else q
+            if any(w in q for w in ["同时", "并且", "还有", "另外", "且"]):
+                multi_agent_chain(full_q)
+            else:
+                react_loop(full_q)
+        except Exception as e:
+            print(f"[错误] {e}")
+        if "记住" in q:
+            fact = q.split("记住", 1)[1].strip().lstrip(" ，,、。.：:")
+            if fact:
+                MEMORY.add(fact)
+                print(f"\n[记忆] 已记住: {fact}")
+    else:
+        print("\n" + "=" * 50)
+        print("  Agent 交互模式已启动")
+        print("  " + "=" * 50)
+        tool_list = " / ".join(list(TOOL_REGISTRY.keys()))
+        for _c in MCP_CLIENTS:
+            mcp_names = [t["name"] for t in _c.tools]
+            tool_list += " / " + " / ".join(mcp_names)
+        print(f"  可用工具：{tool_list}")
+        print("  退出：输入 'exit' 或 '退出'")
+        print("  " + "=" * 50 + "\n")
+        first = True
+        while True:
+            q = input("\n你 > " if not first else "你 > ")
+            first = False
+            if q.lower() in ("exit", "退出", "quit"):
+                print("再见！")
+                break
+            if not q.strip():
+                continue
+            if q == "记忆":
+                print("\n已保存的记忆:")
+                if MEMORY.facts:
+                    for i, fact in enumerate(MEMORY.facts, 1):
+                        print(f"  {i}. {fact}")
+                else:
+                    print("  （无）")
+                continue
+            memories = MEMORY.query(q)
+            memory_context = ""
+            if memories:
+                memory_context = "\n".join([f"（相关记忆：{m['fact']}）" for m in memories])
+            try:
+                full_q = memory_context + q if memory_context else q
+                if any(w in q for w in ["同时", "并且", "还有", "另外", "且"]):
+                    multi_agent_chain(full_q)
+                else:
+                    react_loop(full_q)
+            except Exception as e:
+                print(f"[错误] {e}")
             if "记住" in q:
                 fact = q.split("记住", 1)[1].strip().lstrip(" ，,、。.：:")
                 if fact and MEMORY.add(fact):
