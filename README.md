@@ -153,6 +153,7 @@ handwritten-react-agent/
 ├── mcp_client.py    # MCP 协议模块（JSON-RPC 2.0 over stdio）
 ├── orchestrator.py  # 多 Agent 协作（Orchestrator-Worker）
 ├── eval.py          # 自动化评测
+├── memory.py        # 语义记忆模块（增删查 + 自动遗忘）
 ├── memory.json      # 记忆持久化（自动生成）
 ├── README.md
 └── LICENSE
