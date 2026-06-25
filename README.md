@@ -141,11 +141,43 @@ handwritten-react-agent/
 - scikit-learn
 - sentence-transformers（首次加载约 13 秒）
 
+## 多 Agent 协作（Orchestrator-Worker）
+
+支持将复杂请求自动拆分为多个子任务，每个子任务由独立的 ReAct Loop 执行，最后汇总结果。
+
+### 示例
+
+```
+用户: 现在纽约几点？同时看看mcp_client.py有多大
+
+[Orchestrator] 拆分为 2 个子任务:
+  1. 查询纽约的当前时间
+  2. 查看mcp_client.py的文件大小
+
+[Worker 1/2] → get_current_time("America/New_York") → 纽约凌晨 02:47
+[Worker 2/2] → get_file_info("...mcp_client.py")    → 5,199 字节
+[汇总结果]    → 整合答案
+```
+
+### 触发条件
+
+用户问题含"同时"、"并且"、"还有"、"另外"、"且"等连接词时自动启用。
+
+### 实现
+
+```python
+def multi_agent_chain(user_query):
+    # 1. Orchestrator 拆任务（LLM）
+    # 2. Workers 依次执行（独立 ReAct Loop）
+    # 3. Orchestrator 汇总（LLM 合并结果）
+```
+
 ## 后续计划
 
 - [ ] LLM 自动提取关键信息（无需手动说"记住"）
 - [ ] 记忆遗忘机制（Token 窗口管理）
-- [x] MCP 协议支持（mcp_client.py + --mcp 参数 + 默认自动加载）
+- [x] MCP 协议支持
+- [x] 多 Agent 协作（Orchestrator-Worker）
 - [ ] Web UI 界面
 
 ## MCP 协议支持
