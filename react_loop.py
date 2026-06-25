@@ -5,6 +5,11 @@
 理解这个代码 = 理解了 Agent 最核心的机制
 """
 
+import sys
+import os
+# 确保能找到同目录的 mcp_client.py
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import json
 import re
 import subprocess
