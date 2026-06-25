@@ -28,7 +28,14 @@ MODEL = "deepseek-v4-flash"
 ### 3. 运行
 
 ```bash
+# 交互模式（自动加载 MCP 时间服务器 + 文件系统服务器）
 venv\Scripts\python react_loop.py
+
+# 单次查询
+venv\Scripts\python react_loop.py "现在纽约几点？"
+
+# 指定 MCP 服务器（覆盖默认）
+venv\Scripts\python react_loop.py --mcp "uvx mcp-server-time" "现在几点？"
 ```
 
 交互模式：
@@ -80,7 +87,9 @@ venv\Scripts\python react_loop.py "现在几点了？"
 
 | 工具名 | 功能 | 数据源 |
 |--------|------|--------|
-| `get_time()` | 获取当前时间 | 本地调用 |
+| `get_current_time(tz)` | 获取指定时区时间 | MCP mcp-server-time |
+| `convert_time(...)` | 时区转换 | MCP mcp-server-time |
+| `get_time()` | 获取当前时间（MCP连接时自动隐藏） | 本地 |
 | `calculator(expression)` | 计算数学表达式 | Python eval |
 | `web_search(query)` | 搜索互联网新闻 | AnySearch 搜索引擎 |
 | `fetch_page(url)` | 读取网页正文 | 维基API/HTML提取 |
@@ -109,6 +118,7 @@ venv\Scripts\python eval.py
 ```
 handwritten-react-agent/
 ├── react_loop.py    # 主代码（ReAct Loop + 工具 + 记忆 + 交互模式）
+├── mcp_client.py    # MCP 协议模块（JSON-RPC 2.0 over stdio）
 ├── eval.py          # 自动化评测
 ├── memory.json      # 记忆持久化（自动生成）
 ├── README.md
@@ -126,8 +136,33 @@ handwritten-react-agent/
 
 - [ ] LLM 自动提取关键信息（无需手动说"记住"）
 - [ ] 记忆遗忘机制（Token 窗口管理）
-- [ ] MCP 协议支持
+- [x] MCP 协议支持（mcp_client.py + --mcp 参数 + 默认自动加载）
 - [ ] Web UI 界面
+
+## MCP 协议支持
+
+### 架构
+
+```
+mcp_client.py          ← 独立 MCP 协议模块（纯标准库）
+react_loop.py          ← from mcp_client import MCPClient
+                         --mcp 参数 / DEFAULT_MCP_SERVERS 自动加载
+```
+
+### 默认 MCP 服务器（启动时自动连接）
+
+| 服务器 | 工具 | 启动方式 |
+|--------|------|---------|
+| mcp-server-time | `get_current_time`, `convert_time` | `uvx` |
+| server-filesystem | 文件读写、目录管理、搜索等 14 个工具 | `npx` |
+
+### 通信协议
+
+JSON-RPC 2.0 over stdin/stdout（UTF-8 编码）
+
+```
+Client: initialize → notifications/initialized → tools/list → tools/call
+```
 
 ## License
 
