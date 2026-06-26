@@ -1,6 +1,6 @@
 # handwritten-react-agent
 
-手写 ReAct Agent — 零框架实现 LLM Agent 核心循环，支持交互模式、工具调用和语义记忆。
+手写 ReAct Agent — 零框架实现 LLM Agent 核心循环，支持交互模式、工具调用、语义记忆和文档知识检索（RAG）。
 
 ## 概述
 
@@ -44,8 +44,8 @@ venv\Scripts\python react_loop.py --mcp "uvx mcp-server-time" "现在几点？"
 ==================================================
   Agent 交互模式已启动
   ==================================================
-  可用工具：get_time / calculator / web_search / fetch_page / summarize
-  可问：时间、计算、搜索新闻、读网页、总结内容
+  可用工具：get_time / calculator / web_search / fetch_page / summarize / rag_query
+  可问：时间、计算、搜索新闻、读网页、总结内容、查文档知识
   记忆：说 "记住..." 保存信息，输入 '记忆' 查看
   退出：输入 'exit' 或 '退出'
   ==================================================
@@ -117,6 +117,7 @@ venv\Scripts\python react_loop.py "现在几点了？"
 | `web_search(query)` | 搜索互联网新闻 | AnySearch 搜索引擎 |
 | `fetch_page(url)` | 读取网页正文 | 维基API/HTML提取 |
 | `summarize(text)` | 自动提取摘要 | 抽取式 |
+| `rag_query(query, top_k)` | 从本地文档库检索知识 | BGE 语义搜索（RAG） |
 | `read_text_file(path)` | 读取文件内容 | MCP server-filesystem |
 | `write_file(path, content)` | 写入文件 | MCP server-filesystem |
 | `edit_file(path, edits)` | 编辑文件（行级替换） | MCP server-filesystem |
@@ -150,11 +151,13 @@ venv\Scripts\python eval.py
 ```
 handwritten-react-agent/
 ├── react_loop.py    # 主代码（ReAct Loop + 工具 + 记忆 + 交互模式）
+├── rag.py           # RAG 检索增强生成模块（文档分块/向量化/语义搜索）
 ├── mcp_client.py    # MCP 协议模块（JSON-RPC 2.0 over stdio）
 ├── orchestrator.py  # 多 Agent 协作（Orchestrator-Worker）
 ├── eval.py          # 自动化评测
 ├── memory.py        # 语义记忆模块（增删查 + 自动遗忘）
 ├── memory.json      # 记忆持久化（自动生成）
+├── rag_index.json   # RAG 知识库索引（自动生成，不提交）
 ├── README.md
 └── LICENSE
 ```
@@ -165,6 +168,20 @@ handwritten-react-agent/
 - numpy
 - scikit-learn
 - sentence-transformers（首次加载约 13 秒）
+
+## RAG 文档检索（新增）
+
+Agent 启动时自动索引项目目录下的 `.py`、`.md` 文件，存入 RAG 知识库。对话中 Agent 自主判断何时调用 `rag_query` 查询本地文档。
+
+```
+用户: "mcp_client.py 是做什么的？"
+
+Agent → rag_query("mcp_client.py 功能")
+       → 检索到相关代码片段
+       → 结合上下文回答
+```
+
+基于 BGE-small-zh-v1.5 语义搜索，支持段落级分块、去重、余弦相似度筛选（min_score=0.25）。
 
 ## 多 Agent 协作（Orchestrator-Worker）
 
@@ -254,6 +271,7 @@ def multi_agent_chain(user_query):
 - [ ] 记忆遗忘机制（Token 窗口管理）
 - [x] MCP 协议支持
 - [x] 多 Agent 协作（Orchestrator-Worker）
+- [x] RAG 文档检索
 - [ ] Web UI 界面
 
 ## MCP 协议支持
