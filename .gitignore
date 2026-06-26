@@ -4,3 +4,4 @@ __pycache__/
 _test_*.py
 docs/
 memory.json
+rag_index.json

@@ -36,6 +36,18 @@ _os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
 from memory import Memory
 
 MEMORY = Memory()
+from rag import RAG_INDEX, rag_query, RAG_TOOL_DEFINITION
+
+# ============================================================
+# 预加载 RAG 知识库：启动时自动索引项目文档
+# ============================================================
+print("[启动] 正在加载 RAG 知识库...")
+_rag_dir = os.path.dirname(os.path.abspath(__file__))
+try:
+    n = RAG_INDEX.ingest_directory(_rag_dir)
+    print(f"[启动] RAG 知识库就绪：{len(RAG_INDEX.chunks)} 个片段 (来自 {n} 个文件)")
+except Exception as e:
+    print(f"[启动] RAG 知识库加载跳过: {e}")
 
 
 # ============================================================
@@ -208,6 +220,7 @@ TOOL_REGISTRY = {
     "web_search": tool_web_search,
     "fetch_page": tool_fetch_page,
     "summarize": tool_summarize,
+    "rag_query": rag_query,
 }
 
 # 工具的 JSON 描述（发给 LLM 让它知道能调什么）
@@ -288,6 +301,7 @@ TOOL_DEFINITIONS = [
             },
         },
     },
+    RAG_TOOL_DEFINITION,
 ]
 
 # ============================================================
