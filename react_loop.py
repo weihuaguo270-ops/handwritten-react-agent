@@ -51,11 +51,11 @@ except Exception as e:
 
 # ============================================================
 # 第一步：配置（换成你的 API Key 和地址）
-# ============================================================（换成你的 API Key 和地址）
 # ============================================================
+# API Key 通过环境变量 DEEPSEEK_API_KEY 提供
 API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
-BASE_URL = "https://api.deepseek.com"    # DeepSeek 官方地址
-MODEL = "deepseek-v4-flash"               # DeepSeek V4 Flash
+BASE_URL = "https://api.deepseek.com"
+MODEL = "deepseek-v4-flash"
 
 # ============================================================
 # 第二步：定义工具（就像 C 里声明函数）
