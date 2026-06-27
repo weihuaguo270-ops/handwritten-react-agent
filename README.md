@@ -17,16 +17,25 @@ venv\Scripts\python -m pip install numpy scikit-learn sentence-transformers
 
 ### 2. 配置 API Key
 
-修改 `react_loop.py` 顶部第 57 行，或设置环境变量：
+推荐通过**环境变量**配置，避免 API Key 被误提交到 Git：
+
+```bash
+# Windows（命令行）
+set DEEPSEEK_API_KEY=sk-xxx
+
+# Windows（PowerShell）
+$env:DEEPSEEK_API_KEY="sk-xxx"
+
+# Linux / Mac
+export DEEPSEEK_API_KEY='sk-xxx'
+```
+
+也可以直接修改 `react_loop.py` 第 56 行，将 `os.environ.get(...)` 的第二个参数改为你的 Key：
 
 ```python
-# 方式1：直接修改代码
-API_KEY = os.environ.get("DEEPSEEK_API_KEY", "你的key")
-BASE_URL = "https://api.deepseek.com"
-
-# 方式2：设置环境变量（推荐，避免 key 被提交）
-# Linux/Mac: export DEEPSEEK_API_KEY='sk-xxx'
-# Windows: set DEEPSEEK_API_KEY=sk-xxx
+API_KEY = os.environ.get("DEEPSEEK_API_KEY", "这里填入你的Key")
+BASE_URL = "https://api.deepseek.com"      # DeepSeek 官方 API 地址
+MODEL = "deepseek-v4-flash"                 # DeepSeek V4 Flash
 ```
 
 ### 3. 运行

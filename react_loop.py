@@ -50,12 +50,17 @@ except Exception as e:
 
 
 # ============================================================
-# 第一步：配置（换成你的 API Key 和地址）
+# 第一步：配置
 # ============================================================
-# API Key 通过环境变量 DEEPSEEK_API_KEY 提供
+# 方式一（推荐）：设置环境变量，避免 API Key 被提交到 Git
+#   Windows: set DEEPSEEK_API_KEY=sk-xxx
+#   Linux/Mac: export DEEPSEEK_API_KEY=sk-xxx
+#
+# 方式二：直接在下方填入 API Key（注意：不要提交到 Git）
 API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
-BASE_URL = "https://api.deepseek.com"
-MODEL = "deepseek-v4-flash"
+#                           ↑ 环境变量名   ↑ 留空则不设默认值
+BASE_URL = "https://api.deepseek.com"    # DeepSeek 官方 API 地址
+MODEL = "deepseek-v4-flash"               # DeepSeek V4 Flash
 
 # ============================================================
 # 第二步：定义工具（就像 C 里声明函数）
