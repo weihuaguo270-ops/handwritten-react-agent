@@ -199,6 +199,9 @@ LLM 自动分解复杂任务为子任务，分析任务间的依赖关系，按 
 | `rag_query(query, top_k)` | 从本地文档库检索知识 | BGE 语义搜索（RAG） |
 | `switch_cot_strategy(strategy)` | 运行时切换 CoT 推理策略 | cot.py |
 | `tot_reasoning(problem)` | 使用思维树进行多路径推理 | tot.py |
+| `switch_role(role)` | 切换 AI 角色风格 | prompts.py |
+| `switch_context_strategy(strategy)` | 切换上下文窗口管理策略 | context.py |
+| `toggle_sandbox(enabled)` | 开启/关闭工具沙箱隔离 | sandbox.py |
 | `read_text_file(path)` | 读取文件内容 | MCP server-filesystem |
 | `write_file(path, content)` | 写入文件 | MCP server-filesystem |
 | `edit_file(path, edits)` | 编辑文件（行级替换）| MCP server-filesystem |
@@ -222,10 +225,15 @@ LLM 自动分解复杂任务为子任务，分析任务间的依赖关系，按 
 ## 自动化评测
 
 ```bash
+# 单元测试（无需 API Key）
+python test_all.py
+
+# 端到端集成测试（需要 API Key）
 venv\Scripts\python eval.py
 ```
 
-5 个测试用例，自动检查工具调用、内容完整性、步数。
+`test_all.py` 覆盖 46 项单元测试（CoT、ToT、Planner、RoleManager、Context、Harness、Sandbox、Replay）。
+`eval.py` 覆盖 12 个端到端测试用例。
 
 ## 项目结构
 
@@ -236,10 +244,17 @@ handwritten-react-agent/
 ├── tot.py           # 思维树（ToT）推理模块
 ├── planner.py       # 任务规划器（LLM 驱动分解 + 依赖分析）
 ├── orchestrator.py  # 多 Agent 协作（DAG 调度，按依赖层级执行）
+├── prompts.py       # 角色 Prompt 模板库（5 种角色风格）
+├── context.py       # 上下文窗口管理（截断/丢弃/摘要/LLM 自动选择）
+├── harness.py       # 轨迹记录器（每一步写入 JSON 文件）
+├── sandbox.py       # 工具沙箱隔离（子进程执行，崩溃不炸主进程）
+├── replay.py        # 轨迹重放器（回放 Harness 记录的步骤）
 ├── mcp_client.py    # MCP 协议模块（JSON-RPC 2.0 over stdio）
 ├── rag.py           # RAG 检索增强生成模块（文档分块/向量化/语义搜索）
 ├── memory.py        # 语义记忆模块（增删查 + 自动遗忘）
-├── eval.py          # 自动化评测
+├── eval.py          # 端到端自动化评测（12 个测试用例）
+├── test_all.py      # 单元测试（46 项，无需 API Key）
+├── trajectories/    # 轨迹文件目录（自动生成，不提交）
 ├── memory.json      # 记忆持久化（自动生成）
 ├── rag_index.json   # RAG 知识库索引（自动生成，不提交）
 ├── README.md
@@ -339,6 +354,59 @@ tasks = Planner().plan("搜索并总结新闻", llm_call=my_llm)
 from orchestrator import Orchestrator
 o = Orchestrator(call_llm, react_loop)
 o.execute("搜索AI新闻并写帖子")
+
+# Context 上下文管理
+from context import CONTEXT
+messages = CONTEXT.manage(messages)  # 在每步后调用
+
+# Harness 轨迹记录
+from harness import start_trajectory, finish_trajectory
+start_trajectory(query, model, system_prompt)
+# ... 运行 ReAct Loop ...
+path = finish_trajectory(final_answer)
+
+# Replay 重放（命令行）
+# python replay.py --latest
+```
+
+## 上下文窗口管理（Context Engineering）
+
+防止 ReAct Loop 因对话历史过长超出 LLM 上下文限制。每步结束后自动检查 token 用量，超限时按策略处理。
+
+**支持策略：**
+
+| 策略 | 做法 | 开销 |
+|------|------|------|
+| **auto（默认）** | LLM 根据当前对话内容选择最优策略 | 超限时多 1 次 LLM 调用 |
+| truncate | 从最早的非 system 消息开始删 | 0 额外 LLM 调用 |
+| drop | 只删除已执行完毕的 tool_call + tool_result 对 | 0 额外 LLM 调用 |
+| summarize | 把早期对话压缩成一段摘要 | 1 次 LLM 调用 |
+
+## Harness Engineering
+
+Agent 运行保障层，共五层：
+
+| 层 | 模块 | 职责 |
+|---|------|------|
+| ① Tool 注册与调用 | `react_loop.py` | TOOL_REGISTRY + MCP 自动路由 |
+| ② Observation 回路 | `react_loop.py` | 工具结果自动追加到 messages |
+| ③ 沙箱隔离 | `sandbox.py` | 每个工具在独立子进程执行，崩溃不炸主进程 |
+| ④ 可观测性 | `harness.py` | 每次对话自动写入 JSON 轨迹文件 |
+| ⑤ 重放调试 | `replay.py` | 读轨迹文件逐步回放（`python replay.py --latest`）|
+
+**轨迹文件示例：**
+
+```json
+{
+  "session_id": "20260702_151849_x8kn",
+  "query": "一个篮球120元...",
+  "total_steps": 2,
+  "steps": [
+    {"step": 1, "thought": "先算足球单价...", "action": {"name": "calculator"}},
+    {"step": 2, "thought": "FINAL ANSWER: 450元"}
+  ],
+  "final_answer": "450 元"
+}
 ```
 
 ## 后续计划
@@ -349,9 +417,11 @@ o.execute("搜索AI新闻并写帖子")
 - [x] 思维链（CoT）
 - [x] 思维树（ToT）
 - [x] DAG 任务规划（依赖分析 + 层级调度）
+- [x] 角色注入（5 种角色风格）
+- [x] 上下文窗口管理（截断/丢弃/摘要/auto）
+- [x] Harness Engineering（轨迹记录 + 沙箱 + 重放）
 - [ ] Web UI 界面
-- [ ] LLM 自动提取关键信息（无需手动说"记住"）
-- [ ] 记忆遗忘机制（Token 窗口管理）
+- [ ] 沙箱子进程启动优化（预热缓存）
 
 ## License
 
