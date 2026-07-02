@@ -5,3 +5,5 @@ _test_*.py
 docs/
 memory.json
 rag_index.json
+trajectories/
+_sandbox_runner.py

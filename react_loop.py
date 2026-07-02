@@ -21,6 +21,10 @@ from mcp_client import MCPClient
 from orchestrator import Orchestrator
 from cot import COT, COT_TOOL_DEFINITION, tool_switch_cot_strategy
 from tot import TOT, TOT_TOOL_DEFINITION, tool_tot_reasoning, set_tot_llm_call
+from prompts import ROLE_MANAGER, ROLE_TOOL_DEFINITION, tool_switch_role
+from context import CONTEXT, CONTEXT_TOOL_DEFINITION, tool_switch_context_strategy
+from harness import start_trajectory, current_trajectory, finish_trajectory
+from sandbox import SANDBOX, SANDBOX_TOOL_DEFINITION, tool_toggle_sandbox
 MCP_CLIENTS = []
 
 DEFAULT_MCP_SERVERS = [
@@ -222,6 +226,9 @@ TOOL_REGISTRY = {
     "rag_query": rag_query,
     "switch_cot_strategy": tool_switch_cot_strategy,
     "tot_reasoning": tool_tot_reasoning,
+    "switch_role": tool_switch_role,
+    "switch_context_strategy": tool_switch_context_strategy,
+    "toggle_sandbox": tool_toggle_sandbox,
 }
 
 # 工具的 JSON 描述（发给 LLM 让它知道能调什么）
@@ -305,6 +312,9 @@ TOOL_DEFINITIONS = [
     RAG_TOOL_DEFINITION,
     COT_TOOL_DEFINITION,
     TOT_TOOL_DEFINITION,
+    ROLE_TOOL_DEFINITION,
+    CONTEXT_TOOL_DEFINITION,
+    SANDBOX_TOOL_DEFINITION,
 ]
 
 # ============================================================
@@ -365,6 +375,12 @@ def execute_tool_call(tool_call):
         return '{"error": "参数解析失败"}'
     # 先查本地注册的工具
     if func_name in TOOL_REGISTRY:
+        # 沙箱启用时通过子进程执行
+        if SANDBOX.enabled:
+            sandbox_result = SANDBOX.run(tool_call)
+            if sandbox_result != "__SANDBOX_DISABLED__":
+                return sandbox_result
+        # 直接执行（沙箱关闭或回退）
         try:
             return str(TOOL_REGISTRY[func_name](**arguments))
         except Exception as e:
@@ -388,7 +404,13 @@ def react_loop(user_query, max_steps=10, tool_defs=None):
 2. 最终答案用 FINAL ANSWER: 开头
 3. 根据用户问题选择最合适的工具——包括本地工具和 MCP 远程工具
 4. 搜索2次没结果就直接回答，不要继续搜"""
-    system_prompt = COT.inject(base_prompt, query=user_query)
+    # 角色注入 → CoT 注入（角色先定风格，CoT 再定推理方式）
+    role_enhanced = ROLE_MANAGER.inject(base_prompt, query=user_query)
+    system_prompt = COT.inject(role_enhanced, query=user_query)
+    print(f"[角色] {ROLE_MANAGER.current_role_name()}")
+
+    # 开始轨迹记录
+    start_trajectory(user_query, MODEL, system_prompt)
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -404,12 +426,17 @@ def react_loop(user_query, max_steps=10, tool_defs=None):
     search_count = 0
     for step in range(1, max_steps + 1):
         print(f"--- Step {step}/{max_steps} ---")
+        traj = current_trajectory()
+        if traj:
+            traj.start_step(step)
 
         # (1) 调 LLM（支持传入自定义工具列表）
         msg = call_llm(messages, tool_defs=tool_defs)
         last_content = msg.get("content", "") or ""
         if last_content.strip():
             print(f"[LLM思考] {last_content[:200]}")
+        if traj:
+            traj.add_thought(step, last_content)
 
         # (2) LLM 回复加入对话历史
         messages.append(msg)
@@ -422,14 +449,17 @@ def react_loop(user_query, max_steps=10, tool_defs=None):
             if "FINAL ANSWER:" in last_content.upper():
                 final = last_content.split("FINAL ANSWER:", 1)[1].strip()
                 print(f"\n>>> 最终答案: {final}")
+                finish_trajectory(final)
                 return final
             # 上一步用了工具，这一步没调但给出了实质内容 → 作为答案
             if tools_were_used and len(last_content.strip()) > 10:
                 print(f"\n>>> 最终答案: {last_content.strip()}")
+                finish_trajectory(last_content.strip())
                 return last_content
             # 连续 4 步寒暄（没调工具也不是明确答案）→ 结束
             if not tools_were_used and len(last_content.strip()) > 5 and step >= 4:
                 print(f"\n(连续 {step} 步寒暄未调用工具，自动结束)")
+                finish_trajectory(last_content)
                 return last_content
             continue
 
@@ -455,15 +485,26 @@ def react_loop(user_query, max_steps=10, tool_defs=None):
             result = execute_tool_call(tc)
             print(f"[工具返回] {result[:100]}")
 
+            if traj:
+                traj.add_tool_call(step, name, args, result)
+
             messages.append({
                 "role": "tool",
                 "tool_call_id": tc["id"],
                 "content": result,
             })
 
+        # (5) 每步结束：检查上下文窗口，超限则自动管理
+        before = len(messages)
+        messages = CONTEXT.manage(messages)
+        if len(messages) != before or CONTEXT.last_action:
+            if CONTEXT.last_action:
+                print(f"  [上下文] {CONTEXT.last_action}")
+
     print(f"\n(达到最大步骤 {max_steps}，停止)")
     if last_content.strip():
         print(f">>> 最终答案: {last_content.strip()}")
+    finish_trajectory(last_content.strip() if last_content.strip() else "")
     return last_content
 
 # ============================================================

@@ -35,6 +35,26 @@ TEST_CASES = [
     {"question": "现在东京时间是多少？",
      "expected_tools": ["get_current_time", "convert_time", "get_time", "web_search"],
      "must_contain": ["2026"], "max_steps": 6},
+    # === 新增：角色自动选择 ===
+    {"question": "帮我审查这段代码有什么问题：def add(a,b): return a+b",
+     "must_contain": ["code_reviewer"],
+     "must_contain_any": ["类型", "PEP", "类型注解", "隐患", "建议"],
+     "max_steps": 4, "timeout": 60},
+    {"question": "对比一下Python和JavaScript的优缺点",
+     "must_contain": ["debater"],
+     "must_contain_any": ["优点", "缺点", "优势", "劣势"],
+     "max_steps": 4, "timeout": 60},
+    # === 新增：多步工具调用 ===
+    {"question": "计算 (123+456)*2 和 789/3 分别是多少",
+     "expected_tools": ["calculator"],
+     "must_contain": ["1158", "263"],
+     "max_steps": 4, "timeout": 60},
+    # === 新增：Orchestrator 多任务 ===
+    {"question": "同时帮我查一下今天的时间，并计算 50*30",
+     "tag": "orchestrator",
+     "expected_tools": ["get_time", "get_current_time", "calculator"],
+     "must_contain_any": ["[Orchestrator]", "层级", "子任务", "#1", "#2"],
+     "max_steps": 8, "timeout": 90},
 ]
 
 SCRIPT = r"D:\\agent_learning\\repo\\react_loop.py"
@@ -86,12 +106,19 @@ for i, case in enumerate(TEST_CASES, 1):
         print(f"    ❌ 工具: 预期 {expected}，实际 {info['tools']}")
 
     # Content check
-    missing_k = [k for k in case["must_contain"] if k not in out]
+    missing_k = [k for k in case.get("must_contain", []) if k not in out]
     if not missing_k:
         passed += 1
         print(f"    ✅ 内容: 含所有关键词")
     else:
-        print(f"    ❌ 内容: 缺 {missing_k}")
+        # 如果有 must_contain_any，检查是否命中至少一个
+        any_k = case.get("must_contain_any", [])
+        if any_k and any(k in out for k in any_k):
+            passed += 1
+            hit = [k for k in any_k if k in out]
+            print(f"    ✅ 内容: 命中 {hit}")
+        else:
+            print(f"    ❌ 内容: 缺 {missing_k}" + (f"，预期至少含 {any_k}" if any_k else ""))
 
     # Steps check
     max_s = case.get("max_steps", 10)
