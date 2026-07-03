@@ -94,12 +94,50 @@ class Planner:
         # order = [[task1, task2], [task3]]  # 同层可并行
     """
 
+    # 模板匹配列表（优先于 LLM 分解，零成本、稳定）
+    # 每项: (正则, 构建函数) — 正则匹配则直接用函数构建任务列表
+    _TEMPLATES = [
+        # 搜索+对比类: "搜索今天和明天的天气" "查A和B"
+        (r"(?:搜索|查|查找|搜一下)(.+?)(?:和|与|跟|、)(.+)",
+         lambda m: [
+             Task("1", f"搜索{m.group(1).strip()}"),
+             Task("2", f"搜索{m.group(2).strip()}"),
+             Task("3", "对比分析", depends_on=["1", "2"]),
+         ]),
+        # 计算类: "计算123*456" "算一下..."
+        (r"(?:计算|算一下|算)(.+)",
+         lambda m: [
+             Task("1", f"计算{m.group(1).strip()}"),
+         ]),
+        # 搜索单个: "搜索XXX" "查XXX"
+        (r"(?:搜索|查|查找|搜一下)(.+)",
+         lambda m: [
+             Task("1", f"搜索{m.group(1).strip()}"),
+         ]),
+    ]
+
     def __init__(self):
         self._last_query = ""
 
-    def plan(self, query: str, llm_call: callable) -> list[Task]:
-        """LLM 自动分解任务 + 分析依赖"""
+    def plan(self, query: str, llm_call: callable = None) -> list[Task]:
+        """分解任务为子任务
+
+        优先匹配模板（零 LLM 调用），未命中则走 LLM 自动分解。
+        """
         self._last_query = query
+
+        # 第1关：模板匹配（模型无关、零成本、稳定）
+        import re
+        for pattern, builder in self._TEMPLATES:
+            m = re.search(pattern, query)
+            if m:
+                tasks = builder(m)
+                if tasks:
+                    return tasks
+
+        # 第2关：兜底走 LLM 自动分解
+        if llm_call is None:
+            return []
         prompt = _PLAN_PROMPT.format(query=query)
         msg = llm_call([
             {"role": "system", "content": "你是一个专业的任务分解助手，严格按格式输出。"},

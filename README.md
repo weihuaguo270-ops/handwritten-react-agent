@@ -167,7 +167,7 @@ ToT:          ┌→ 路径A1 → 评估:6分 → 继续
 
 ### 任务规划（Planner）- planner.py + orchestrator.py
 
-LLM 自动分解复杂任务为子任务，分析任务间的依赖关系，按 DAG（有向无环图）调度执行。
+分层策略分解复杂任务：**模板匹配（零 LLM）优先，未命中才走 LLM 自动分解**，分析依赖关系后按 DAG 调度执行。
 
 ```
 用户: "搜索今天和明天的天气，对比温差"
@@ -184,7 +184,7 @@ LLM 自动分解复杂任务为子任务，分析任务间的依赖关系，按 
 
 **依赖分析流程：**
 
-1. `Planner.plan()` → LLM 输出结构化工单（`task_N: 描述 | depends_on: N, M`）
+1. `Planner.plan()` → **模板匹配（零 LLM）优先**，常见模式（搜索对比、计算等）正则命中直接返回；未命中才走 LLM 分解（`task_N: 描述 | depends_on: N, M`）
 2. `Planner.schedule()` → 拓扑排序，计算执行层级
 3. `Orchestrator.execute()` → 按层级调度：同层并行、层间串行
 4. `_build_context()` → 前置任务的结果自动注入到后置任务的 prompt
@@ -278,7 +278,7 @@ handwritten-react-agent/
 ├── react_loop.py    # 主代码（ReAct Loop + 工具 + 记忆 + 交互模式）
 ├── cot.py           # 思维链（CoT）策略模块
 ├── tot.py           # 思维树（ToT）推理模块
-├── planner.py       # 任务规划器（LLM 驱动分解 + 依赖分析）
+├── planner.py       # 任务规划器（模板+LLM 分层分解 + 依赖分析）
 ├── orchestrator.py  # 多 Agent 协作（DAG 调度，按依赖层级执行）
 ├── prompts.py       # 角色 Prompt 模板库（5 种角色风格）
 ├── context.py       # 上下文窗口管理（截断/丢弃/摘要/LLM 自动选择）
