@@ -580,7 +580,18 @@ def multi_agent_chain(user_query, parallel=False):
     """多 Agent 协作（内部使用 Orchestrator 类）"""
     return Orchestrator(call_llm, react_loop, tool_definitions=TOOL_DEFINITIONS).execute(user_query, parallel=parallel)
 
-if __name__ == "__main__":
+def cli_entry():
+    """CLI 入口点：供 pip 安装后的 'agent' 命令使用"""
+    main()
+
+def main():
+    """命令行入口：支持交互模式和单次问题模式。"""
+    global TOOL_DEFINITIONS
+
+    if not API_KEY.strip():
+        print("错误：未配置 DEEPSEEK_API_KEY，也没有在 react_loop.py 中设置 fallback API_KEY。")
+        sys.exit(1)
+
     _sys_argv = sys.argv[1:]
     _parallel_mode = "--parallel" in _sys_argv
     if _parallel_mode:
@@ -708,3 +719,7 @@ if __name__ == "__main__":
                 if fact and MEMORY.add(fact):
                     print(f"\n[记忆] 已记住: {fact}")
                     print(f"[记忆] 当前共 {len(MEMORY.facts)} 条")
+
+
+if __name__ == "__main__":
+    main()

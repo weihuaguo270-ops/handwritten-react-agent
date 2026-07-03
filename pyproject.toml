@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "handwritten-react-agent"
+version = "0.1.0"
+description = "手写 ReAct Agent — 零框架实现 LLM Agent 核心循环"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = [
+    "numpy",
+    "scikit-learn",
+    "sentence-transformers",
+]
+
+[project.scripts]
+agent = "react_loop:cli_entry"

@@ -6,16 +6,31 @@
 
 从零实现 ReAct（Reasoning + Acting）循环，不依赖 LangChain、AutoGPT 等框架，只用 Python 标准库 + LLM API + BGE Embedding。
 
-## 快速开始
+## 安装
 
-### 1. 创建虚拟环境（推荐）
+### 方式一：开发模式安装（推荐）
 
 ```bash
-python -m venv venv
-venv\Scripts\python -m pip install numpy scikit-learn sentence-transformers
+cd D:\agent_learning\repo
+pip install -e .
 ```
 
-### 2. 配置 API Key
+安装后可直接使用 `agent` 命令启动交互模式。
+
+### 方式二：仅安装依赖
+
+```bash
+pip install numpy scikit-learn sentence-transformers
+```
+
+## 快速开始
+
+### 1. 配置 API Key（必需）
+
+⚠️ **启动检查**：程序启动时会自动检查 API Key 是否配置，若未配置会显示错误并退出：
+```
+错误：未配置 DEEPSEEK_API_KEY，也没有在 react_loop.py 中设置 fallback API_KEY。
+```
 
 推荐通过**环境变量**配置，避免 API Key 被误提交到 Git：
 
@@ -30,7 +45,7 @@ $env:DEEPSEEK_API_KEY="sk-xxx"
 export DEEPSEEK_API_KEY='sk-xxx'
 ```
 
-也可以直接修改 `react_loop.py` 第 56 行，将 `os.environ.get(...)` 的第二个参数改为你的 Key：
+也可以直接修改 `react_loop.py` 第 66 行，将 `os.environ.get(...)` 的第二个参数改为你的 Key：
 
 ```python
 API_KEY = os.environ.get("DEEPSEEK_API_KEY", "这里填入你的Key")
@@ -38,17 +53,38 @@ BASE_URL = "https://api.deepseek.com"      # DeepSeek 官方 API 地址
 MODEL = "deepseek-v4-flash"                 # DeepSeek V4 Flash
 ```
 
-### 3. 运行
+### 2. 运行
+
+**方式一：使用 agent 命令（推荐，需先 pip install -e . 安装）**
 
 ```bash
-# 交互模式（自动加载 MCP 时间服务器 + 文件系统服务器）
-venv\Scripts\python react_loop.py
+# 交互模式
+agent
 
 # 单次查询
-venv\Scripts\python react_loop.py "现在纽约几点？"
+agent "现在几点？"
 
-# 指定 MCP 服务器（覆盖默认）
-venv\Scripts\python react_loop.py --mcp "uvx mcp-server-time" "现在几点？"
+# 并行多任务
+agent --parallel "搜索AI新闻并且总结量子计算进展"
+```
+
+**方式二：直接运行 Python 文件**
+
+```bash
+# 交互模式
+python react_loop.py
+
+# 单次查询
+python react_loop.py "现在纽约几点？"
+
+# 指定 MCP 服务器
+python react_loop.py --mcp "uvx mcp-server-time" "现在几点？"
+```
+
+**方式三：模块方式运行**
+
+```bash
+python -m repo
 ```
 
 交互模式：
