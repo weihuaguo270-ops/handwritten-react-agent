@@ -259,7 +259,9 @@ Harness = Recorder（轨迹记录）+ Sandbox（沙箱隔离）+ Replay（回放
 | `switch_cot_strategy(s)` | 切换 CoT 推理策略 | cot.py |
 | `switch_role(role)` | 切换 AI 角色风格 | prompts.py |
 | `switch_context_strategy(s)` | 切换上下文管理策略 | context.py |
-| `toggle_sandbox(enabled)` | 开启/关闭沙箱隔离 | sandbox.py |
+| `toggle_sandbox(enabled)` | 开启/关闭沙箱隔离 | harness/sandbox.py |
+| `start_dashboard(port)` | 启动 Dashboard Web 界面 | react_loop.py |
+| `clear_trajectories(days)` | 清理历史轨迹文件 | harness/recorder.py |
 | `read_text_file(path)` | 读取文件内容 | MCP |
 | `write_file(path, content)` | 写入文件 | MCP |
 | `edit_file(path, edits)` | 行级文件编辑 | MCP |
@@ -292,8 +294,9 @@ Harness = Recorder（轨迹记录）+ Sandbox（沙箱隔离）+ Replay（回放
 ├── test_all.py         # 单元测试（46 项，无需 API Key）
 ├── trajectories/       # 轨迹文件
 ├── dashboard/          # Agent 交互 + 轨迹回放 Web 界面
-│   ├── server.py       # Flask API 服务（端口 5050，含聊天/轨迹接口）
-│   └── index.html      # 前端页面（左侧聊天面板 + 右侧轨迹回放）
+│   ├── server.py       # Flask API 服务（端口 5050，含聊天/轨迹/清理/关闭接口）
+│   ├── index.html      # 前端页面（左侧聊天面板 + 右侧轨迹回放 + 清理/关闭按钮）
+│   └── kill_old.py     # 启动前清除旧进程
 ├── notes/              # 开发笔记（bug 记录/架构/Dashboard 心路历程）
 ├── README.md
 └── LICENSE
@@ -330,6 +333,9 @@ pip install numpy scikit-learn sentence-transformers
 - [x] Agent 轨迹查看器 + 交互面板（dashboard/）
 - [x] 沙箱子进程预热缓存
 - [x] start_dashboard 工具（Agent 可主动启动 Dashboard）
+- [x] Dashboard 关闭按钮 + 自动清理旧进程
+- [x] Agent 清理轨迹工具（clear_trajectories）
+- [x] Dashboard 轨迹清理弹窗
 - [ ] Dashboard 会话详情对比模式
 
 ## License
