@@ -288,9 +288,10 @@ Planner 负责将复杂请求分解为子任务并分析依赖关系；Orchestra
 ├── eval.py             # 端到端评测（12 个测试用例）
 ├── test_all.py         # 单元测试（46 项，无需 API Key）
 ├── trajectories/       # 轨迹文件
-├── dashboard/          # Agent 轨迹查看器（Flask + 前端）
-│   ├── server.py       # API 服务（端口 5050）
-│   └── index.html      # 前端页面（步骤回放 + 自动播放）
+├── dashboard/          # Agent 交互 + 轨迹回放 Web 界面
+│   ├── server.py       # Flask API 服务（端口 5050，含聊天/轨迹接口）
+│   └── index.html      # 前端页面（左侧聊天面板 + 右侧轨迹回放）
+├── notes/              # 开发笔记（bug 记录/架构/Dashboard 心路历程）
 ├── README.md
 └── LICENSE
 ```
@@ -323,9 +324,10 @@ pip install numpy scikit-learn sentence-transformers
 - [x] 角色注入
 - [x] 上下文窗口管理
 - [x] Harness / Sandbox / Replay
-- [x] Agent 轨迹查看器（dashboard/）
+- [x] Agent 轨迹查看器 + 交互面板（dashboard/）
 - [x] 沙箱子进程预热缓存
-- [ ] dashboard 增加会话详情、搜索筛选、对比模式
+- [x] start_dashboard 工具（Agent 可主动启动 Dashboard）
+- [ ] Dashboard 会话详情对比模式
 
 ## License
 
