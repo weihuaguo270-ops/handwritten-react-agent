@@ -237,11 +237,13 @@ Planner 负责将复杂请求分解为子任务并分析依赖关系；Orchestra
 | drop | 仅删已执行的 tool_call→tool_result 对 | 0 |
 | summarize | 将早期对话压缩为摘要 | 1 次 |
 
-### Harness / Sandbox / Replay（harness.py / sandbox.py / replay.py）
+### Harness 层（harness/）
 
-- **Harness：** 每步 thought/action/observation/token_usage 持久化为 JSON
-- **Sandbox：** subprocess + timeout 隔离不可信代码，AST 白名单安全解析
-- **Replay：** `python replay.py --latest` 从轨迹文件逐步回放
+Harness = Recorder（轨迹记录）+ Sandbox（沙箱隔离）+ Replay（回放调试），对应 Agent = LLM + Harness 中的保障层。
+
+- **Recorder（harness/recorder.py）：** 每步 thought/action/observation/token_usage 持久化为 JSON
+- **Sandbox（harness/sandbox.py）：** subprocess + timeout 隔离不可信代码，AST 白名单安全解析；支持启动时预热缓存
+- **Replay：** `python -m harness.replay --latest` 从轨迹文件逐步回放
 
 ## 已实现工具
 
