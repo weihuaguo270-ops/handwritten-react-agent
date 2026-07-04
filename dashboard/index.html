@@ -88,11 +88,28 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-s
         <button class="btn" id="btn-prev" disabled onclick="prevStep()">←</button>
         <button class="btn btn-primary" id="btn-play" onclick="togglePlay()">▶ 播放</button>
         <button class="btn" id="btn-next" disabled onclick="nextStep()">→</button>
+        <button class="btn" onclick="showClearDialog()">🗑️</button>
       </div>
     </div>
     <div class="content" id="viewer">
       <div class="empty-state"><div class="icon">📂</div><div class="text">从左侧输入问题开始</div></div>
     </div>
+  </div>
+</div>
+
+<div id="clear-dialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:100;align-items:center;justify-content:center" onclick="if(event.target===this)hideClearDialog()">
+  <div style="background:#fff;border-radius:12px;padding:24px;min-width:360px;box-shadow:0 4px 20px rgba(0,0,0,.15)">
+    <h3 style="margin-bottom:12px">🗑️ 清理轨迹文件</h3>
+    <div style="font-size:13px;color:#666;margin-bottom:16px">
+      轨迹文件保留在 <code>trajectories/</code> 目录，删除后不可恢复。
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button class="btn" onclick="doClear(0)" style="flex:1">全部删除</button>
+      <button class="btn" onclick="doClear(7)" style="flex:1">保留近7天</button>
+      <button class="btn" onclick="doClear(30)" style="flex:1">保留近30天</button>
+    </div>
+    <div id="clear-result" style="font-size:12px;color:#666;margin-bottom:12px"></div>
+    <button class="btn" onclick="hideClearDialog()" style="width:100%">取消</button>
   </div>
 </div>
 
@@ -265,6 +282,35 @@ function togglePlay() {
     }
     currentStep++; updateButtons(); renderTrajectory();
   }, 1500);
+}
+
+// ===== 清理轨迹弹窗 =====
+function showClearDialog() {
+  document.getElementById('clear-dialog').style.display = 'flex';
+  document.getElementById('clear-result').textContent = '';
+}
+function hideClearDialog() {
+  document.getElementById('clear-dialog').style.display = 'none';
+}
+async function doClear(days) {
+  const btn = event.target;
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '清理中...';
+  try {
+    const res = await fetch('/api/trajectories/clear', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({days}),
+    });
+    const data = await res.json();
+    document.getElementById('clear-result').textContent = data.message || data.error || '清理完成';
+    loadList();  // 刷新左侧列表
+  } catch (err) {
+    document.getElementById('clear-result').textContent = '请求失败: ' + err.message;
+  }
+  btn.disabled = false;
+  btn.textContent = originalText;
 }
 </script>
 </body>
