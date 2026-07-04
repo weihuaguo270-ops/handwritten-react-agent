@@ -74,10 +74,33 @@ class Sandbox:
         })
     """
 
-    def __init__(self, timeout: int = 30, enabled: bool = True):
+    def __init__(self, timeout: int = 30, enabled: bool = True, prewarm: bool = True):
         self.timeout = timeout
         self.enabled = enabled
+        self._prewarmed = False
         _ensure_runner()
+        if prewarm and enabled:
+            self._prewarm()
+
+    def _prewarm(self):
+        """预热子进程：启动一次轻量计算，让 Python 缓存字节码和模块导入"""
+        try:
+            warmup_payload = json.dumps({
+                "function": {"name": "get_time", "arguments": "{}"}
+            })
+            subprocess.run(
+                [sys.executable, _RUNNER_PATH, warmup_payload],
+                capture_output=True, text=True, timeout=10,
+                cwd=os.path.dirname(os.path.abspath(__file__)),
+                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            )
+            self._prewarmed = True
+        except Exception:
+            self._prewarmed = False
+
+    @property
+    def warm_status(self) -> str:
+        return "已预热" if self._prewarmed else "未预热"
 
     def run(self, tool_call: dict) -> str:
         """在子进程中执行工具调用

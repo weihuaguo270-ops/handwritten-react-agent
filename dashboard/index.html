@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Agent 轨迹查看器</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; color: #333; }
+  .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 24px; margin-bottom: 20px; }
+  .card { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .card-header { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #555; }
+  .step { border-left: 3px solid #4a90d9; padding-left: 12px; margin-bottom: 12px; }
+  .thought { color: #2c3e50; margin-bottom: 6px; white-space: pre-wrap; font-size: 14px; }
+  .tool-call { background: #f0f7ff; padding: 8px; border-radius: 4px; margin: 6px 0; font-family: monospace; font-size: 13px; }
+  .tool-result { background: #f9f9f9; padding: 8px; border-radius: 4px; margin: 6px 0; font-family: monospace; font-size: 13px; color: #666; }
+  .final { border-left: 3px solid #27ae60; padding-left: 12px; margin-bottom: 12px; font-size: 15px; font-weight: 500; }
+  .meta { font-size: 12px; color: #999; margin-top: 4px; }
+  .empty { color: #999; text-align: center; padding: 40px; }
+  .error { color: #e74c3c; }
+  #file-list { margin-bottom: 20px; }
+  #file-list a { display: inline-block; margin-right: 8px; margin-bottom: 8px; padding: 6px 12px; background: #e8e8e8; border-radius: 4px; text-decoration: none; color: #333; font-size: 13px; }
+  #file-list a:hover { background: #d0d0d0; }
+  #file-list a.active { background: #4a90d9; color: #fff; }
+  .nav { display: flex; gap: 12px; margin-bottom: 16px; }
+  .nav button { padding: 6px 14px; border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; }
+  .nav button:hover { background: #f0f0f0; }
+  .nav button:disabled { opacity: .4; cursor: not-allowed; }
+  .step-number { font-size: 12px; color: #4a90d9; font-weight: 600; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🛤️ Agent 轨迹查看器</h1>
+
+  <div id="file-list">
+    <a href="#" onclick="return false;" style="background:#ccc">加载轨迹文件中...</a>
+  </div>
+
+  <div class="nav">
+    <button id="prev-step" disabled>← 上一步</button>
+    <button id="play-pause">▶ 自动播放</button>
+    <button id="next-step" disabled>下一步 →</button>
+    <span id="step-indicator" style="font-size:13px;color:#999;line-height:28px;margin-left:8px;"></span>
+  </div>
+
+  <div id="viewer">
+    <div class="empty">选择一个轨迹文件查看</div>
+  </div>
+</div>
+
+<script>
+let currentData = null;
+let currentStep = 0;
+let playTimer = null;
+
+async function loadFileList() {
+  const res = await fetch('/api/trajectories');
+  const files = await res.json();
+  const container = document.getElementById('file-list');
+  container.innerHTML = '';
+  if (files.length === 0) {
+    container.innerHTML = '<span style="color:#999">暂无轨迹文件</span>';
+    return;
+  }
+  files.forEach((f, i) => {
+    const a = document.createElement('a');
+    a.href = '#';
+    a.textContent = f.replace('.json', '');
+    a.onclick = (e) => {
+      e.preventDefault();
+      document.querySelectorAll('#file-list a').forEach(el => el.classList.remove('active'));
+      a.classList.add('active');
+      loadFile(f);
+    };
+    if (i === 0) { a.classList.add('active'); loadFile(f); }
+    container.appendChild(a);
+  });
+}
+
+async function loadFile(name) {
+  const res = await fetch('/api/trajectories/' + name);
+  currentData = await res.json();
+  currentStep = 0;
+  document.getElementById('prev-step').disabled = true;
+  document.getElementById('next-step').disabled = currentData.steps.length === 0;
+  renderStep(0);
+}
+
+function renderStep(idx) {
+  const viewer = document.getElementById('viewer');
+  const d = currentData;
+  const steps = d.steps || [];
+  document.getElementById('step-indicator').textContent = steps.length > 0 ? `步骤 ${idx + 1} / ${steps.length}` : '无步骤';
+
+  if (steps.length === 0) {
+    viewer.innerHTML = '<div class="empty">该轨迹无步骤</div>';
+    return;
+  }
+
+  let html = `<div class="card"><div class="card-header">📋 会话信息</div>
+    <div style="font-size:13px;color:#666;">
+      <div>query: ${esc(d.query || '')}</div>
+      <div>model: ${esc(d.model || '')}</div>
+      <div>session: ${esc(d.session_id || '')}</div>
+      <div>步骤: ${d.total_steps || steps.length}</div>
+    </div></div>`;
+
+  const step = steps[idx];
+  html += `<div class="card"><div class="card-header">📌 步骤 ${idx + 1}</div>`;
+  html += `<div class="thought">${esc(step.thought || step.content || '(空)')}</div>`;
+
+  if (step.action) {
+    html += `<div class="tool-call">🔧 ${esc(step.action.name)}(${esc(JSON.stringify(step.arguments || step.action.arguments || {}))})</div>`;
+  }
+  if (step.tool_calls) {
+    (step.tool_calls || []).forEach(tc => {
+      html += `<div class="tool-call">🔧 ${esc(tc.name || tc.function?.name)}(${esc(JSON.stringify(tc.arguments || tc.function?.arguments || {}))})</div>`;
+    });
+  }
+  if (step.result) {
+    html += `<div class="tool-result">${esc(step.result.substring(0, 300))}</div>`;
+  }
+  html += `<div class="meta">${d.final_answer && idx === steps.length - 1 ? '✅ 最终答案' : ''}</div>`;
+  html += '</div>';
+
+  // 如果当前步数已到最后，展示最终答案
+  if (idx === steps.length - 1 && d.final_answer) {
+    html += `<div class="card final"><div class="card-header">🎯 最终答案</div>${esc(d.final_answer)}</div>`;
+  }
+
+  viewer.innerHTML = html;
+}
+
+function esc(s) {
+  const div = document.createElement('div');
+  div.textContent = s || '';
+  return div.innerHTML;
+}
+
+document.getElementById('prev-step').onclick = () => {
+  if (currentStep > 0) { currentStep--; renderStep(currentStep); }
+  document.getElementById('prev-step').disabled = currentStep === 0;
+  document.getElementById('next-step').disabled = false;
+};
+
+document.getElementById('next-step').onclick = () => {
+  if (currentData && currentStep < currentData.steps.length - 1) { currentStep++; renderStep(currentStep); }
+  document.getElementById('prev-step').disabled = false;
+  document.getElementById('next-step').disabled = currentData && currentStep >= currentData.steps.length - 1;
+};
+
+document.getElementById('play-pause').onclick = function() {
+  if (playTimer) {
+    clearInterval(playTimer); playTimer = null; this.textContent = '▶ 自动播放';
+  } else {
+    this.textContent = '⏸ 暂停';
+    playTimer = setInterval(() => {
+      if (!currentData || currentStep >= currentData.steps.length - 1) {
+        clearInterval(playTimer); playTimer = null; document.getElementById('play-pause').textContent = '▶ 自动播放';
+        return;
+      }
+      currentStep++;
+      renderStep(currentStep);
+      document.getElementById('prev-step').disabled = false;
+      document.getElementById('next-step').disabled = currentStep >= currentData.steps.length - 1;
+    }, 1500);
+  }
+};
+
+loadFileList();
+</script>
+</body>
+</html>
