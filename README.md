@@ -277,15 +277,21 @@ Planner 负责将复杂请求分解为子任务并分析依赖关系；Orchestra
 ├── orchestrator.py     # 多 Agent DAG 调度
 ├── prompts.py          # 角色注入（5 种风络）
 ├── context.py          # 上下文窗口管理（4 种策略）
-├── harness.py          # 轨迹记录器（JSON 持久化）
-├── sandbox.py          # 子进程沙箱隔离
-├── replay.py           # 轨迹重放器
+├── harness/            # Harness 层（沙箱 + 记录 + 重放）
+│   ├── __init__.py     # 统一 Harness 入口
+│   ├── recorder.py     # 轨迹记录（原来的 harness.py）
+│   ├── sandbox.py      # 子进程隔离（原来的 sandbox.py）
+│   └── replay.py       # 离线回放（原来的 replay.py）
 ├── mcp_client.py       # MCP 协议客户端
 ├── rag.py              # RAG 检索增强生成
 ├── memory.py           # 语义记忆系统
 ├── eval.py             # 端到端评测（12 个测试用例）
 ├── test_all.py         # 单元测试（46 项，无需 API Key）
 ├── trajectories/       # 轨迹文件
+├── dashboard/          # Agent 交互 + 轨迹回放 Web 界面
+│   ├── server.py       # Flask API 服务（端口 5050，含聊天/轨迹接口）
+│   └── index.html      # 前端页面（左侧聊天面板 + 右侧轨迹回放）
+├── notes/              # 开发笔记（bug 记录/架构/Dashboard 心路历程）
 ├── README.md
 └── LICENSE
 ```
@@ -318,8 +324,10 @@ pip install numpy scikit-learn sentence-transformers
 - [x] 角色注入
 - [x] 上下文窗口管理
 - [x] Harness / Sandbox / Replay
-- [ ] Agent Web 界面
-- [ ] 沙箱子进程预热缓存
+- [x] Agent 轨迹查看器 + 交互面板（dashboard/）
+- [x] 沙箱子进程预热缓存
+- [x] start_dashboard 工具（Agent 可主动启动 Dashboard）
+- [ ] Dashboard 会话详情对比模式
 
 ## License
 

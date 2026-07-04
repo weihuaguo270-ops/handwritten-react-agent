@@ -24,7 +24,7 @@ from tot import TOT, TOT_TOOL_DEFINITION, tool_tot_reasoning, set_tot_llm_call
 from prompts import ROLE_MANAGER, ROLE_TOOL_DEFINITION, tool_switch_role
 from context import CONTEXT, CONTEXT_TOOL_DEFINITION, tool_switch_context_strategy
 from harness import start_trajectory, current_trajectory, finish_trajectory
-from sandbox import SANDBOX, SANDBOX_TOOL_DEFINITION, tool_toggle_sandbox
+from harness import SANDBOX, SANDBOX_TOOL_DEFINITION, tool_toggle_sandbox
 MCP_CLIENTS = []
 
 DEFAULT_MCP_SERVERS = [
@@ -249,6 +249,7 @@ TOOL_REGISTRY = {
     "switch_role": tool_switch_role,
     "switch_context_strategy": tool_switch_context_strategy,
     "toggle_sandbox": tool_toggle_sandbox,
+    "start_dashboard": tool_start_dashboard,
 }
 
 # 工具的 JSON 描述（发给 LLM 让它知道能调什么）
@@ -335,6 +336,23 @@ TOOL_DEFINITIONS = [
     ROLE_TOOL_DEFINITION,
     CONTEXT_TOOL_DEFINITION,
     SANDBOX_TOOL_DEFINITION,
+    {
+        "type": "function",
+        "function": {
+            "name": "start_dashboard",
+            "description": "启动 Dashboard Web 界面（轨迹查看器 + 聊天面板），在浏览器中直观查看 Agent 的思考过程和工具调用",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "port": {
+                        "type": "integer",
+                        "description": "端口号（默认 5050）"
+                    }
+                },
+                "required": []
+            }
+        }
+    },
 ]
 
 # ============================================================
@@ -382,6 +400,29 @@ def _tot_llm_wrapper(prompt: str) -> str:
 
 
 set_tot_llm_call(_tot_llm_wrapper)
+
+
+DASHBOARD_PROCESS = []
+
+def tool_start_dashboard(port: int = 5050) -> str:
+    """启动 Dashboard Web 界面（轨迹查看器 + 聊天面板）"""
+    import subprocess
+    if DASHBOARD_PROCESS and DASHBOARD_PROCESS[0].poll() is None:
+        return f"Dashboard 已在运行: http://127.0.0.1:{port}"
+    try:
+        server_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard", "server.py")
+        if not os.path.exists(server_script):
+            return f"错误: 找不到 dashboard/server.py"
+        proc = subprocess.Popen(
+            [sys.executable, server_script],
+            cwd=os.path.dirname(server_script),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        DASHBOARD_PROCESS.append(proc)
+        return f"Dashboard 已启动: http://127.0.0.1:{port}（记得在浏览器打开）"
+    except Exception as e:
+        return f"启动失败: {e}"
 
 
 # ============================================================

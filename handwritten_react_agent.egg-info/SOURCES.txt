@@ -1,0 +1,9 @@
+LICENSE
+README.md
+pyproject.toml
+handwritten_react_agent.egg-info/PKG-INFO
+handwritten_react_agent.egg-info/SOURCES.txt
+handwritten_react_agent.egg-info/dependency_links.txt
+handwritten_react_agent.egg-info/entry_points.txt
+handwritten_react_agent.egg-info/requires.txt
+handwritten_react_agent.egg-info/top_level.txt

@@ -226,7 +226,7 @@ os.remove(path2)
 # 7. Sandbox
 # ============================================================
 print("\n【Sandbox 沙箱隔离】")
-from sandbox import Sandbox, SANDBOX
+from harness import Sandbox, SANDBOX
 
 sandbox = Sandbox(enabled=False)
 check("沙箱模块存在", hasattr(sandbox, "run"))
@@ -234,7 +234,7 @@ check("沙箱默认关闭", SANDBOX.enabled == False)
 check("_sandbox_runner 存在", os.path.exists("_sandbox_runner.py"))
 check("工具定义存在", "toggle_sandbox" in str(sandbox.__class__.__module__) or True)
 
-SANDBOX_TOOL_DEFINITION = __import__("sandbox", fromlist=["SANDBOX_TOOL_DEFINITION"]).SANDBOX_TOOL_DEFINITION
+SANDBOX_TOOL_DEFINITION = __import__("harness.sandbox", fromlist=["SANDBOX_TOOL_DEFINITION"]).SANDBOX_TOOL_DEFINITION
 check("SANDBOX_TOOL_DEFINITION 存在", "toggle_sandbox" in str(SANDBOX_TOOL_DEFINITION))
 
 
@@ -277,12 +277,12 @@ t = start_trajectory("重放测试", "m1")
 t.add_thought(1, "测试")
 path = finish_trajectory("ok")
 
-result = subprocess.run([sys.executable, "replay.py", "--latest"],
+result = subprocess.run([sys.executable, "-m", "harness.replay", "--latest"],
                        capture_output=True, text=True, timeout=10)
 check("replay 输出含轨迹信息",
       "🎯" in result.stdout or "Step" in result.stdout or "最终" in result.stdout)
 
-result2 = subprocess.run([sys.executable, "replay.py"],
+result2 = subprocess.run([sys.executable, "-m", "harness.replay"],
                         capture_output=True, text=True, timeout=10)
 check("replay 列表含记录数", "共" in result2.stdout or "轨迹" in result2.stdout)
 
