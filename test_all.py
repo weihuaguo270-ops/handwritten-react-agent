@@ -239,34 +239,108 @@ check("SANDBOX_TOOL_DEFINITION 存在", "toggle_sandbox" in str(SANDBOX_TOOL_DEF
 
 
 # ============================================================
-# 8. 工具定义检查
+# 8. 工具模块（tools/）
+# ============================================================
+print("\n【工具模块 tools/】")
+from tools.calculator import calculator
+from tools.summarize import summarize
+from tools.get_time import get_time
+
+check("calculator 1+2", calculator("1+2") == "3")
+check("calculator 小数", calculator("3.5*2") == "7.0")
+check("calculator 括号", calculator("(2+3)*4") == "20")
+check("calculator 非法字符", "错误" in calculator("__import__('os')"))
+check("calculator 语法错误", "错误" in calculator("1++"))
+check("get_time 含日期", "-" in get_time() and ":" in get_time())
+check("summarize 短文本", "过短" in summarize("短"))
+check("summarize 正常", len(summarize("句子一。句子二。句子三。句子四。句子五。", 3)) > 0)
+
+# 工具定义存在
+from tools.get_time import TOOL_DEFINITION as TD_GET
+from tools.calculator import TOOL_DEFINITION as TD_CALC
+check("工具定义 get_time 正确", TD_GET["function"]["name"] == "get_time")
+check("工具定义 calculator 正确", TD_CALC["function"]["name"] == "calculator")
+
+
+# ============================================================
+# 9. 工具注册完整性（从 tools 直接导入，不依赖 react_loop.py）
 # ============================================================
 print("\n【工具注册完整性】")
-try:
-    import importlib
-    spec = importlib.util.spec_from_file_location("react_loop", "react_loop.py")
-    if spec and spec.loader:
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        TOOL_REGISTRY = mod.TOOL_REGISTRY
-    else:
-        raise ImportError("无法加载 react_loop")
-except Exception as e:
-    # 如果 import 超时（BGE 模型加载慢），直接从已知列表检查
-    print("  ⚠️ react_loop 加载较慢，从备份列表检查")
-    TOOL_REGISTRY = {}
+from tools import TOOL_REGISTRY as TR, TOOL_DEFINITIONS as TDS
 
 expected_tools = [
     "get_time", "calculator", "web_search", "fetch_page", "summarize",
     "rag_query", "switch_cot_strategy", "tot_reasoning", "switch_role",
-    "switch_context_strategy", "toggle_sandbox",
+    "switch_context_strategy", "toggle_sandbox", "start_dashboard", "clear_trajectories",
 ]
 for name in expected_tools:
-    check(f"工具 {name} 已注册", name in TOOL_REGISTRY if TOOL_REGISTRY else True)
+    check(f"TOOL_REGISTRY 含 {name}", name in TR)
+check(f"TOOL_DEFINITIONS 数量 {len(expected_tools)}", len(TDS) == len(expected_tools))
 
-if not TOOL_REGISTRY:
-    print("  ⚠️ 工具注册检查跳过（需单独运行 python -c \"from react_loop import TOOL_REGISTRY\"）")
+# TOOL_DEFINITIONS 每个都有完整结构
+for td in TDS:
+    fn = td.get("function", {})
+    check(f"  定义 {fn.get('name','?')} 含 parameters",
+          "parameters" in fn and "type" in fn.get("parameters", {}))
+    check(f"  定义 {fn.get('name','?')} 含 description",
+          bool(fn.get("description", "").strip()))
 
+
+# ============================================================
+# 10. Memory（语义记忆）
+# ============================================================
+print("\n【Memory 记忆系统】")
+import memory as mem_mod
+from memory import Memory
+
+m = Memory()
+m.facts = []
+check("空记忆无检索", len(m.query("test")) == 0)
+
+# 删除测试（先清空再测试）
+m.clear()
+m.add("小明是学生")
+check("添加后事实数>0", len(m.facts) > 0)
+
+found = m.query("小明")
+check("查询小明有结果", len(found) > 0)
+
+# remove 测试
+removed = m.remove("小明")
+check("remove 返回 True", removed)
+check("remove 后事实减少", len(m.facts) == 0)
+
+
+# ============================================================
+# 11. Orchestrator
+# ============================================================
+print("\n【Orchestrator 多 Agent】")
+from orchestrator import Planner, Task
+import re as _re
+
+# 测试 Planner 的模板匹配正则（不依赖 LLM）
+p = Planner()
+TEMPLATES = p._TEMPLATES
+
+# 手动跑模板匹配检验
+def _match_template(query):
+    for pattern, builder in TEMPLATES:
+        m = _re.search(pattern, query)
+        if m:
+            tasks = builder(m)
+            if tasks:
+                return tasks
+    return None
+
+tasks = _match_template("搜索今天北京和上海的天气，对比温差")
+check("搜索对比模板命中", tasks is not None)
+if tasks:
+    check("模板返回3个任务", len(tasks) == 3)
+    check("任务1含'今天'", "今天" in tasks[0].description)
+    check("任务3依赖1和2", tasks[2].depends_on == ["1", "2"])
+
+check("空查询无模板", _match_template("") is None)
+check("打招呼无模板", _match_template("你好") is None)
 
 # ============================================================
 import subprocess

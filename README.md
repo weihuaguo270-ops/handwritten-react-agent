@@ -32,6 +32,11 @@ query 输入
 
 react_loop 入口（普通或 Worker）:
   │
+  ├── step -1: LLM 配置加载
+  │     llm.LLM_DEFAULT 按 LLM_PROVIDER/llm_config.json 确定 provider
+  │     react_loop.py 通过 _current_llm.chat() 统一调用，不直接处理 HTTP
+  │     切换模型: 一行 export LLM_PROVIDER=openai，不改代码
+  │
   ├── step 0: 构建 system prompt（三层拼接）
   │     (1) base_prompt: ReAct 格式规则
   │     (2) ROLE_MANAGER.inject() → 根据 query 关键词选角色
@@ -117,19 +122,47 @@ react_loop 入口（普通或 Worker）:
 | Orchestrator | query 发给 Orchestrator.execute() 时 | 外部包装 | query → 子任务 → Worker 汇总 |
 | CoT | react_loop 启动时、system prompt 构建阶段 | base_prompt 拼接 | 向 system_prompt 末尾追加推理指令 |
 | ToT | 仅当 LLM 选择 tot_reasoning 工具时 | ReAct Loop 内工具执行阶段 | 工具调用 → 内部多轮 LLM 调用 → 结果字符串 |
+| LLM 调用 | call_llm() 被调用时 | llm.py → _current_llm.chat() | 按 LLM_PROVIDER 选择配置 → HTTP POST /chat/completions |
+| 工具路由 | LLM 返回 tool_calls 时 | TOOL_REGISTRY 查找（tools/ 模块） | 函数名 → tools.TOOL_REGISTRY[name]() 或遍历 MCP_CLIENTS |
 | Context | ReAct Loop 每步结束后 | messages.append 之后 | 检查 token → 可选压缩/截断 |
 | Harness | react_loop 进入/退出/每步工具调用 | start_trajectory / add_thought / add_tool_call / finish_trajectory | 持久化到 trajectories/*.json |
 | Dashboard | 用户主动启动（命令行或 Agent 调用 start_dashboard 工具） | 独立 Flask Web 服务（端口 5050） | 读取 trajectories/ 目录 → 浏览器展示轨迹回放与实时对话 |
 ## 快速开始
 
-### 1. 配置 API Key
+### 1. 配置 LLM
+
+项目支持任意 OpenAI 兼容 API（DeepSeek / OpenAI / Ollama / 自定义），通过配置文件和环境变量切换，无需修改代码。
+
+**方式一：环境变量（推荐）**
 
 ```bash
-# Windows
-set DEEPSEEK_API_KEY=sk-xxx
-# Linux / Mac
-export DEEPSEEK_API_KEY='sk-xxx'
+# 设置 API Key（替换为你的 Key）
+export DEEPSEEK_API_KEY=sk-xxx
+
+# 可选：切换 Provider（默认从 llm_config.json 读取）
+export LLM_PROVIDER=deepseek    # DeepSeek（默认）
+# export LLM_PROVIDER=openai    # OpenAI
+# export LLM_PROVIDER=ollama    # 本地 Ollama（无需 Key）
 ```
+
+**方式二：修改配置文件**
+
+直接编辑 `llm_config.json`，修改默认 provider 或设置 api_key：
+
+```json
+{
+  "default": "deepseek",
+  "providers": {
+    "deepseek": {
+      "base_url": "https://api.deepseek.com",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "model": "deepseek-v4-flash"
+    }
+  }
+}
+```
+
+支持任意 OpenAI 兼容 API，在 `llm_config.json` 中添加 provider 即可。
 
 ### 2. 运行
 
@@ -144,11 +177,14 @@ python react_loop.py "现在几点？"
 ### 3. 运行测试
 
 ```bash
-# 单元测试（无需 API Key）
+# 单元测试（无需 API Key，当前 87+ 项覆盖 12 个模块）
 python test_all.py
 
-# 端到端测试（需 API Key）
+# 端到端测试（需配置 API Key）
 python eval.py
+
+# 使用指定模型跑评测
+python eval.py --provider openai
 ```
 
 ### 交互模式示例
@@ -245,22 +281,41 @@ Harness = Recorder（轨迹记录）+ Sandbox（沙箱隔离）+ Replay（回放
 - **Sandbox（harness/sandbox.py）：** subprocess + timeout 隔离不可信代码，AST 白名单安全解析；支持启动时预热缓存
 - **Replay：** `python -m harness.replay --latest` 从轨迹文件逐步回放
 
+### LLM 配置模块（llm.py + llm_config.json）
+
+LLM 调用被抽象为独立模块，支持任意 OpenAI 兼容 API，通过配置文件驱动：
+
+- **多 Provider：** 内置 DeepSeek / OpenAI / Ollama / 自定义，通过 `LLM_PROVIDER` 环境变量切换
+- **配置优先：** 环境变量 > 配置文件的 api_key 字段 > 空
+- **零改动换模型：** `export LLM_PROVIDER=openai`，不改一行代码
+- **统一调用：** react_loop.py 通过 `_current_llm.chat()` 调用，不直接处理 HTTP
+
+### 工具模块（tools/）
+
+所有本地工具集中在 `tools/` 目录，统一注册和管理：
+
+- **独立文件：** 每个工具一个 .py 文件（calculator / web_search / fetch_page / summarize / get_time / dashboard）
+- **统一入口：** `tools/__init__.py` 自动合并 TOOL_REGISTRY + TOOL_DEFINITIONS
+- **即插即用：** 新增工具只需在 tools/ 下加文件，不改主循环
+- **兼容性：** 与 RAG / MCP 等外部工具源共存，LLM 通过同一 TOOL_REGISTRY 查找
+
 ## 已实现工具
 
 | 工具名 | 功能 | 来源 |
 |--------|------|------|
 | `get_current_time(tz)` | 获取指定时区时间 | MCP |
-| `calculator(expression)` | 计算数学表达式（AST 安全解析） | 内置 |
-| `web_search(query)` | 搜索互联网 | AnySearch |
-| `fetch_page(url)` | 读取网页正文 | 内置 |
-| `summarize(text)` | 自动文字摘要 | 内置 |
+| `get_time()` | 获取当前日期时间 | tools/get_time.py |
+| `calculator(expression)` | 计算数学表达式（AST 安全解析） | tools/calculator.py |
+| `web_search(query)` | 搜索互联网 | tools/web_search.py |
+| `fetch_page(url)` | 读取网页正文 | tools/fetch_page.py |
+| `summarize(text)` | 自动文字摘要 | tools/summarize.py |
 | `rag_query(query, top_k)` | 从本地文档库检索知识 | BGE |
 | `tot_reasoning(problem)` | 思维树多路径推理 | tot.py |
 | `switch_cot_strategy(s)` | 切换 CoT 推理策略 | cot.py |
 | `switch_role(role)` | 切换 AI 角色风格 | prompts.py |
 | `switch_context_strategy(s)` | 切换上下文管理策略 | context.py |
 | `toggle_sandbox(enabled)` | 开启/关闭沙箱隔离 | harness/sandbox.py |
-| `start_dashboard(port)` | 启动 Dashboard Web 界面 | react_loop.py |
+| `start_dashboard(port)` | 启动 Dashboard Web 界面 | tools/dashboard.py |
 | `clear_trajectories(days)` | 清理历史轨迹文件 | harness/recorder.py |
 | `read_text_file(path)` | 读取文件内容 | MCP |
 | `write_file(path, content)` | 写入文件 | MCP |
@@ -275,7 +330,17 @@ Harness = Recorder（轨迹记录）+ Sandbox（沙箱隔离）+ Replay（回放
 ## 项目结构
 
 ```
-├── react_loop.py       # 主循环（ReAct + 工具 + 记忆 + 交互）
+├── react_loop.py       # 主循环（ReAct + 工具路由 + 记忆 + 交互）
+├── llm.py              # LLM 调用封装（多 Provider、配置驱动）
+├── llm_config.json     # LLM Provider 配置文件（.gitignore 排除）
+├── tools/              # 工具模块（统一注册，新增工具只加文件不改主循环）
+│   ├── __init__.py     # 统一入口：自动合并所有工具函数和 TOOL_DEFINITIONS
+│   ├── get_time.py     # 获取当前时间
+│   ├── calculator.py   # 数学表达式计算
+│   ├── web_search.py   # 互联网搜索
+│   ├── fetch_page.py   # 网页正文提取
+│   ├── summarize.py    # 文本摘要
+│   └── dashboard.py    # Dashboard Web 界面启动
 ├── cot.py              # 思维链（4 种策略自动切换）
 ├── tot.py              # 思维树（BFS/DFS 双搜索模式）
 ├── planner.py          # 任务规划器（模板+LLM 分层分解）
@@ -291,7 +356,7 @@ Harness = Recorder（轨迹记录）+ Sandbox（沙箱隔离）+ Replay（回放
 ├── rag.py              # RAG 检索增强生成
 ├── memory.py           # 语义记忆系统
 ├── eval.py             # 端到端评测（12 个测试用例）
-├── test_all.py         # 单元测试（46 项，无需 API Key）
+├── test_all.py         # 单元测试（87+ 项覆盖 12 个模块，无需 API Key）
 ├── trajectories/       # 轨迹文件
 ├── dashboard/          # Agent 交互 + 轨迹回放 Web 界面
 │   ├── server.py       # Flask API 服务（端口 5050，含聊天/轨迹/清理/关闭接口）
@@ -336,7 +401,9 @@ pip install numpy scikit-learn sentence-transformers
 - [x] Dashboard 关闭按钮 + 自动清理旧进程
 - [x] Agent 清理轨迹工具（clear_trajectories）
 - [x] Dashboard 轨迹清理弹窗
-- [ ] Dashboard 会话详情对比模式
+- [x] 多 Provider LLM 支持（llm.py + llm_config.json）
+- [x] 工具集中管理（tools/ 独立目录统一注册）
+- [x] 测试覆盖率提升（12个模块，87+ 项测试，无需 API Key）
 
 ## License
 

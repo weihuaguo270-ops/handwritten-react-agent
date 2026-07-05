@@ -3,6 +3,12 @@
 手写 ReAct Loop - 最小可用版本
 不用任何框架，纯 Python + OpenAI 兼容 API
 理解这个代码 = 理解了 Agent 最核心的机制
+
+LLM 配置：通过 llm_config.json + LLM_PROVIDER 环境变量控制。
+  export LLM_PROVIDER=deepseek    # 使用 DeepSeek
+  export LLM_PROVIDER=openai      # 使用 OpenAI
+  export LLM_PROVIDER=ollama      # 使用本地 Ollama
+  默认使用 llm_config.json 中的 default 字段。
 """
 
 
@@ -19,13 +25,13 @@ from urllib.error import URLError
 from urllib.parse import urlparse, quote
 from mcp_client import MCPClient
 from orchestrator import Orchestrator
-from cot import COT, COT_TOOL_DEFINITION, tool_switch_cot_strategy
-from tot import TOT, TOT_TOOL_DEFINITION, tool_tot_reasoning, set_tot_llm_call
-from prompts import ROLE_MANAGER, ROLE_TOOL_DEFINITION, tool_switch_role
-from context import CONTEXT, CONTEXT_TOOL_DEFINITION, tool_switch_context_strategy
+from tot import TOT, set_tot_llm_call
+from prompts import ROLE_MANAGER
+from context import CONTEXT
 from harness import start_trajectory, current_trajectory, finish_trajectory
-from harness import SANDBOX, SANDBOX_TOOL_DEFINITION, tool_toggle_sandbox
-from harness.recorder import clear_trajectories
+from harness import SANDBOX
+from llm import LLM_DEFAULT, LLM
+from tools import TOOL_REGISTRY, TOOL_DEFINITIONS
 MCP_CLIENTS = []
 
 DEFAULT_MCP_SERVERS = [
@@ -57,357 +63,37 @@ except Exception as e:
 
 
 # ============================================================
-# 第一步：配置
+# 第一步：配置 — 通过 llm_config.json + LLM_PROVIDER 环境变量
 # ============================================================
-# 方式一（推荐）：设置环境变量，避免 API Key 被提交到 Git
-#   Windows: set DEEPSEEK_API_KEY=sk-xxx
-#   Linux/Mac: export DEEPSEEK_API_KEY=sk-xxx
-#
-# 方式二：直接在下方填入 API Key（注意：不要提交到 Git）
-API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
-#                           ↑ 环境变量名   ↑ 留空则不设默认值
-BASE_URL = "https://api.deepseek.com"    # DeepSeek 官方 API 地址
-MODEL = "deepseek-v4-flash"               # DeepSeek V4 Flash
+# 当前 provider 由 LLM_DEFAULT 决定（模块加载时自动从配置读取）
+# 切换 provider 方式：
+#   1. Windows: set LLM_PROVIDER=openai
+#   2. Linux:   export LLM_PROVIDER=ollama
+#   3. 修改 llm_config.json 中的 default 字段
+#   4. 代码中手动创建：llm = LLM(provider="openai")
+# 注意：不要提交 API Key 到 Git！
+_current_llm = LLM_DEFAULT
 
 # ============================================================
-# 第二步：定义工具（就像 C 里声明函数）
+# 第二步：工具 — 由 tools/ 模块统一管理
+# 新增工具只需在 tools/ 下加文件，tools/__init__.py 自动注册
 # ============================================================
-def tool_calculator(expression: str) -> str:
-    """计算数学表达式（基于 AST 解析，安全无注入风险）"""
-    import ast
-    try:
-        # 解析表达式为 AST，只允许数学运算
-        tree = ast.parse(expression.strip(), mode='eval')
-        ALLOWED_NODES = (ast.Expression, ast.Constant, ast.UnaryOp,
-                         ast.UAdd, ast.USub, ast.BinOp, ast.Add, ast.Sub, ast.Mult, ast.Div)
-        for node in ast.walk(tree):
-            if not isinstance(node, ALLOWED_NODES):
-                return "错误：表达式包含非法操作"
-        # AST 通过检查，编译执行
-        code = compile(tree, '<string>', 'eval')
-        result = eval(code)
-        return str(result)
-    except SyntaxError:
-        return "错误：表达式语法错误"
-    except Exception as e:
-        return f"计算错误：{e}"
-
-def tool_get_time() -> str:
-    """返回当前时间"""
-    return time.strftime("%Y-%m-%d %H:%M:%S")
-
-
-def tool_web_search(query: str, max_results: int = 1) -> str:
-    """搜索互联网，返回实时新闻结果"""
-    try:
-
-        max_results = min(max(1, max_results), 5)
-        payload = json.dumps({
-            "jsonrpc": "2.0",
-            "method": "tools/call",
-            "params": {
-                "name": "search",
-                "arguments": {
-                    "query": query,
-                    "content_types": "news",
-                    "max_results": max_results,
-                    "zone": "intl"
-                }
-            },
-            "id": 1
-        }).encode()
-
-        http_request = req.Request(
-            "https://api.anysearch.com/mcp",
-            data=payload,
-            headers={
-                "Content-Type": "application/json",
-                "User-Agent": "Mozilla/5.0"
-            },
-            method="POST"
-        )
-
-        with req.urlopen(http_request, timeout=15) as resp:
-            data = json.loads(resp.read().decode())
-
-        result_text = data.get("result", {}).get("content", [{}])[0].get("text", "")
-        if not result_text or "Search Results" not in result_text:
-            return "搜索未找到相关结果"
-
-        # 解析 markdown 格式的结果
-        results = []
-        idx = 0
-        for line in result_text.split("\n"):
-            if line.startswith("### "):
-                idx += 1
-                title = line[4:].strip()
-                title = title.split(". ", 1)[1] if ". " in title else title
-                results.append(f"{idx}. {title}")
-            elif line.startswith("- **URL**"):
-                url = line.replace("- **URL**: ", "").strip()
-                results.append(f"   链接: {url}")
-            elif line.startswith("- ") and not line.startswith("- **"):
-                snippet = line[2:].strip()
-                if snippet:
-                    results.append(f"   {snippet[:300]}")
-
-        return "\n".join(results) if results else "搜索未找到相关结果"
-
-    except Exception as e:
-        return f"搜索出错: {e}"
-
-def tool_fetch_page(url: str) -> str:
-    """读取网页内容并提取正文"""
-    try:
-        # 验证 URL，防止 SSRF
-        parsed = urlparse(url)
-        if parsed.scheme not in ("http", "https"):
-            return f"不支持的协议: {parsed.scheme}"
-        # 简单内网地址阻断
-        netloc = parsed.netloc.split(":")[0]
-        if netloc in ("127.0.0.1", "localhost", "0.0.0.0", "::1"):
-            return "不允许访问内网地址"
-        if netloc.startswith("10.") or netloc.startswith("172.") or netloc.startswith("192.168."):
-            return "不允许访问内网地址"
-
-        # 如果是维基百科，用 API 直接取纯文本
-        if "wikipedia.org" in url:
-            title = url.split("/wiki/")[-1].split("#")[0]
-            netloc = urlparse(url).netloc
-            api_url = (f"https://{netloc}/w/api.php"
-                       f"?action=query&prop=extracts&explaintext"
-                       f"&titles={quote(title)}&format=json&exchars=3000")
-            r = req.Request(api_url, headers={"User-Agent": "Mozilla/5.0"})
-            with req.urlopen(r, timeout=10) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-            pages = data.get("query", {}).get("pages", {})
-            for pid, pdata in pages.items():
-                if pid != "-1" and "extract" in pdata:
-                    text = pdata["extract"].strip()
-                    if len(text) > 3000:
-                        text = text[:3000] + "\n\n...(截取)"
-                    return text if text else "页面无内容"
-
-        # 非维基百科：请求网页
-        r = req.Request(url, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        })
-        with req.urlopen(r, timeout=10) as resp:
-            html = resp.read().decode("utf-8", errors="replace")
-
-        # 提取 <p> 标签中的正文段落
-        paras = re.findall(
-            r'<p[^>]*>([^<]+(?:<[^/][^>]*>[^<]*</[^>]+>)?[^<]*)</p>',
-            html, re.DOTALL
-        )
-        if paras:
-            text = "\n".join(p.strip() for p in paras)
-            text = re.sub(r'<[^>]+>', '', text)
-            text = re.sub(r'\n{3,}', '\n\n', text).strip()
-        else:
-            text = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.DOTALL)
-            text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.DOTALL)
-            text = re.sub(r'<[^>]+>', '\n', text)
-            text = re.sub(r'\n[ \t]+\n', '\n', text)
-            text = re.sub(r'\n{3,}', '\n\n', text).strip()
-
-        if len(text) > 3000:
-            text = text[:3000] + "\n\n...(截取)"
-        return text if text else "页面无正文可提取"
-    except Exception as e:
-        return f"读取失败: {e}"
-
-def tool_summarize(text: str, max_sentences: int = 5) -> str:
-    """自动提取文本摘要（抽取式：取前几个关键句子）"""
-    if not text or len(text) < 20:
-        return "文本过短，无需摘要"
-
-    # 按句号、问号、感叹号、换行分割句子
-    sentences = re.split(r'[。！？\n]', text)
-    sentences = [s.strip() for s in sentences if len(s.strip()) > 10]
-
-    if not sentences:
-        return text[:500]
-
-    # 取前 max_sentences 个有内容的句子
-    summary = "。".join(sentences[:max_sentences]) + "。"
-    if len(summary) > 1000:
-        summary = summary[:1000] + "..."
-
-    return summary
-
-
-
-TOOL_REGISTRY = {
-    "get_time": tool_get_time,
-    "calculator": tool_calculator,
-    "web_search": tool_web_search,
-    "fetch_page": tool_fetch_page,
-    "summarize": tool_summarize,
-    "rag_query": rag_query,
-    "switch_cot_strategy": tool_switch_cot_strategy,
-    "tot_reasoning": tool_tot_reasoning,
-    "switch_role": tool_switch_role,
-    "switch_context_strategy": tool_switch_context_strategy,
-    "toggle_sandbox": tool_toggle_sandbox,
-    "start_dashboard": tool_start_dashboard,
-    "clear_trajectories": clear_trajectories,
-}
-
-# 工具的 JSON 描述（发给 LLM 让它知道能调什么）
-TOOL_DEFINITIONS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "web_search",
-            "description": "搜索互联网新闻和网页，获取实时信息（基于AnySearch搜索引擎）",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "搜索关键词"
-                    },
-                    "max_results": {
-                        "type": "integer",
-                        "description": "返回结果数量，默认1条。用户明确说了数量才传更大值"
-                    },
-                },
-                "required": ["query"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "calculator",
-            "description": "计算数学表达式",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "expression": {
-                        "type": "string",
-                        "description": "数学表达式，如 '2 + 3 * 4'",
-                    }
-                },
-                "required": ["expression"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "fetch_page",
-            "description": "读取网页内容，输入URL返回正文文本",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "url": {
-                        "type": "string",
-                        "description": "要读取的网页地址"
-                    }
-                },
-                "required": ["url"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "summarize",
-            "description": "自动提取文本摘要，输入长文本返回精简摘要",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "text": {
-                        "type": "string",
-                        "description": "要总结的文本内容"
-                    },
-                    "max_sentences": {
-                        "type": "integer",
-                        "description": "摘要保留的句子数（默认5）"
-                    }
-                },
-                "required": ["text"],
-            },
-        },
-    },
-    RAG_TOOL_DEFINITION,
-    COT_TOOL_DEFINITION,
-    TOT_TOOL_DEFINITION,
-    ROLE_TOOL_DEFINITION,
-    CONTEXT_TOOL_DEFINITION,
-    SANDBOX_TOOL_DEFINITION,
-    {
-        "type": "function",
-        "function": {
-            "name": "start_dashboard",
-            "description": "启动 Dashboard Web 界面（轨迹查看器 + 聊天面板），在浏览器中直观查看 Agent 的思考过程和工具调用",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "port": {
-                        "type": "integer",
-                        "description": "端口号（默认 5050）"
-                    }
-                },
-                "required": []
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "clear_trajectories",
-            "description": "删除历史轨迹文件，用于清理 Agent 的对话记录。支持按天数保留（如只保留最近7天）或全部删除",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "days": {
-                        "type": "integer",
-                        "description": "保留最近几天的文件（0=全部删除，7=保留近7天）"
-                    }
-                },
-                "required": ["days"]
-            }
-        }
-    },
-]
+# TOOL_REGISTRY 和 TOOL_DEFINITIONS 已从 tools 中导入。
+# 注意：TOOL_DEFINITIONS 在 main() 中会被 MCP 工具扩展。
 
 # ============================================================
 # 第三步：调用 LLM
 # ============================================================
-def call_llm(messages, max_retries=2, tool_defs=None):
-    payload = {
-        "model": MODEL,
-        "messages": messages,
-        "tools": tool_defs if tool_defs is not None else TOOL_DEFINITIONS,
-        "tool_choice": "auto",
-        "temperature": 0.7,
-        "max_tokens": 2000,
-    }
-    r = req.Request(
-        f"{BASE_URL}/chat/completions",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {API_KEY}",
-        },
-        method="POST",
+def call_llm(messages, max_retries=2, tool_defs=None,
+             temperature=None, max_tokens=None):
+    """调用 LLM，返回消息对象。使用 _current_llm（可通过 LLM_PROVIDER 切换）"""
+    return _current_llm.chat(
+        messages,
+        tool_defs=tool_defs if tool_defs is not None else TOOL_DEFINITIONS,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        max_retries=max_retries,
     )
-    for attempt in range(max_retries):
-        try:
-            with req.urlopen(r, timeout=30) as resp:
-                result = json.loads(resp.read().decode("utf-8"))
-                return result["choices"][0]["message"]
-        except URLError as e:
-            if attempt < max_retries - 1:
-                time.sleep(1)
-                continue
-            return {"role": "assistant", "content": f"LLM失败: {e}"}
-        except json.JSONDecodeError as e:
-            return {"role": "assistant", "content": f"解析失败: {e}"}
-    return {"role": "assistant", "content": "超过最大重试"}
 
 
 # ToT 模块的 LLM 调用适配器（它在内部需要调 LLM 做生成和评估）
@@ -419,36 +105,6 @@ def _tot_llm_wrapper(prompt: str) -> str:
 
 
 set_tot_llm_call(_tot_llm_wrapper)
-
-
-DASHBOARD_PROCESS = []
-
-def tool_start_dashboard(port: int = 5050) -> str:
-    """启动 Dashboard Web 界面（轨迹查看器 + 聊天面板）"""
-    import subprocess
-    import sys as _sys
-    # 先杀掉旧进程（通过 server.py 自带的 kill_old_server）
-    try:
-        kill_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard", "kill_old.py")
-        if os.path.exists(kill_script):
-            subprocess.run([_sys.executable, kill_script], cwd=os.path.dirname(kill_script),
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
-    except Exception:
-        pass
-    try:
-        server_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard", "server.py")
-        if not os.path.exists(server_script):
-            return f"错误: 找不到 dashboard/server.py"
-        proc = subprocess.Popen(
-            [_sys.executable, server_script],
-            cwd=os.path.dirname(server_script),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        DASHBOARD_PROCESS.append(proc)
-        return f"Dashboard 已启动: http://127.0.0.1:{port}（记得在浏览器打开）"
-    except Exception as e:
-        return f"启动失败: {e}"
 
 
 # ============================================================
@@ -655,8 +311,13 @@ def main():
     """命令行入口：支持交互模式和单次问题模式。"""
     global TOOL_DEFINITIONS
 
-    if not API_KEY.strip():
-        print("错误：未配置 DEEPSEEK_API_KEY，也没有在 react_loop.py 中设置 fallback API_KEY。")
+    if not _current_llm or not _current_llm.api_key.strip():
+        _provider = os.environ.get("LLM_PROVIDER",
+                                    _current_llm.provider_name if _current_llm else "?")
+        print(f"错误：未配置 {_provider} 的 API Key。")
+        print(f"请设置环境变量或在 llm_config.json 中配置。")
+        print(f"  Windows: set {_provider.upper()}_API_KEY=sk-xxx")
+        print(f"  Linux:   export {_provider.upper()}_API_KEY=sk-xxx")
         sys.exit(1)
 
     _sys_argv = sys.argv[1:]

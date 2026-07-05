@@ -1,7 +1,11 @@
 """
 Agent Eval — 自动化评测框架
+用法：
+    python eval.py                          # 使用默认 provider
+    python eval.py --provider openai         # 切换到 OpenAI
+    python eval.py --provider ollama         # 使用本地 Ollama
 """
-import subprocess, sys, re, json
+import subprocess, sys, re, json, os
 
 TEST_CASES = [
     # === 本地工具 / MCP 时间 ===
@@ -59,10 +63,25 @@ TEST_CASES = [
 
 SCRIPT = r"D:\\agent_learning\\repo\\react_loop.py"
 
+# 解析 --provider 参数
+_EVAL_PROVIDER = None
+if "--provider" in sys.argv:
+    idx = sys.argv.index("--provider")
+    if idx + 1 < len(sys.argv) and not sys.argv[idx + 1].startswith("--"):
+        _EVAL_PROVIDER = sys.argv[idx + 1]
+        # 从 sys.argv 移除，避免传给子进程
+        sys.argv = sys.argv[:idx] + sys.argv[idx + 2:]
+
+# 构建子进程环境
+_EVAL_ENV = {**os.environ}
+if _EVAL_PROVIDER:
+    _EVAL_ENV["LLM_PROVIDER"] = _EVAL_PROVIDER
+
 
 def run_one(question, timeout=60):
     r = subprocess.run([sys.executable, SCRIPT, question],
-                       capture_output=True, text=True, timeout=timeout)
+                       capture_output=True, text=True, timeout=timeout,
+                       env=_EVAL_ENV)
     return r.stdout
 
 
@@ -79,6 +98,10 @@ def parse(out):
 results = []
 print("=" * 50)
 print("  Agent Eval 报告")
+if _EVAL_PROVIDER:
+    print(f"  Provider: {_EVAL_PROVIDER}")
+else:
+    print(f"  Provider: (默认，由 LLM_PROVIDER 或 llm_config.json 决定)")
 print("=" * 50)
 
 for i, case in enumerate(TEST_CASES, 1):
