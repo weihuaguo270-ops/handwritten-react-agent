@@ -439,6 +439,25 @@ python orchestrator.py "帮我查时间"    # 多 Agent 编排
 - **`extract_memory`** — 用 LLM 从对话中提取事实，通过 `add_or_update` 语义去重后存入记忆
 - **`should_continue`** — 条件边：有 tool_calls → tools，否则 → extract_memory → END
 
+### LangChain 在架构中的角色
+
+LangChain 提供基础抽象层，不参与 Agent 循环控制：
+
+| 层面 | 使用的 LangChain 组件 | 所在文件 | 作用 |
+|------|---------------------|---------|------|
+| **模型层** | `ChatOpenAI` | `graph/llm.py` | 统一调用 DeepSeek / OpenAI / Ollama 等 API |
+| **工具层** | `@tool` 装饰器 | `graph/tools.py` | 把普通函数标记为工具，自动生成 tool schema |
+| **消息层** | `AIMessage` / `ToolMessage` / `SystemMessage` / `HumanMessage` | `graph/agent.py` | 标准消息类型，供 `MessagesState` 自动管理 |
+| **检索层** | `FAISS` + `HuggingFaceEmbeddings` | `graph/rag.py` | 文档向量化存储与语义检索 |
+
+LangGraph 在架构中的角色：
+
+| 层面 | 使用的 LangGraph 组件 | 所在文件 | 作用 |
+|------|---------------------|---------|------|
+| **循环控制** | `StateGraph` + 节点 + 条件边 | `graph/agent.py` | 定义 Agent 执行流程（call_model → tools → extract_memory） |
+| **状态管理** | `AgentState(TypedDict)` + `operator.add` reducer | `graph/agent.py` | 自动追加对话历史，不必手动 append |
+| **轨迹记录** | `MemorySaver` checkpointer | `graph/agent.py` | 持久化对话状态，支持多轮会话 |
+
 ### LangGraph 多 Agent 编排
 
 `graph/orchestrator.py`：
