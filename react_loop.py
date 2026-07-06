@@ -292,7 +292,11 @@ def auto_extract_memory(user_query, assistant_answer):
     saved = 0
     for fact in facts:
         if len(fact) > 5 and not any(w in fact for w in ["LLM失败", "错误", "抱歉", "值得记住", "信息:", "没有提供", "没有任何", "事实:", "个人信息"]):
-            if MEMORY.add(fact):
+            action, detail = MEMORY.add_or_update(fact)
+            if action == "added":
+                saved += 1
+            elif action == "updated":
+                print(f"[记忆] 更新: \"{detail}\" → \"{fact}\"")
                 saved += 1
     if saved > 0:
         print(f"[记忆] 自动记忆: 保存了 {saved} 条新信息")

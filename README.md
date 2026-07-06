@@ -384,6 +384,140 @@ pip install numpy scikit-learn sentence-transformers
 - scikit-learn
 - sentence-transformers
 
+## LangGraph / LangChain 版本
+
+项目同时提供了 `graph/` 目录下的 **LangChain/LangGraph 全栈版本**，与手写版模块一一对应：
+
+| 手写模块 | LangChain 替代 | 文件 |
+|---------|---------------|------|
+| `llm.py` | `ChatOpenAI`（读 `llm_config.json` 配置） | `graph/llm.py` |
+| `tools/` + `TOOL_REGISTRY` | `@tool` 装饰器 | `graph/tools.py` |
+| `rag.py` | `FAISS` + `HuggingFaceEmbeddings` | `graph/rag.py` |
+| `memory.py` | 语义记忆（同 BGE + LRU，新增语义去重更新） | `graph/memory.py` |
+| `prompts.py` + `cot.py` | `SystemMessage` + PromptTemplate | `graph/prompts.py` |
+| `react_loop.py` | `StateGraph` 节点 + 条件边 | `graph/agent.py` |
+| `orchestrator.py` | `StateGraph` 编排（supervisor → worker → join） | `graph/orchestrator.py` |
+| `main() / __main__.py` | CLI 入口（交互模式 + 单次查询） | `graph/main.py` |
+
+**运行方式：**
+```bash
+cd graph
+python main.py "现在几点了？"          # 单次查询
+python main.py                        # 交互模式
+python orchestrator.py "帮我查时间"    # 多 Agent 编排
+```
+
+### LangGraph 架构
+
+`graph/agent.py` 使用 `StateGraph` 定义 Agent 循环：
+
+```
+                    ┌──────────┐
+                    │ call_model│  ← 调 ChatOpenAI（绑定工具）
+                    └────┬─────┘
+                         │
+                    ┌────▼─────┐
+                    │ 有 tool_  │  ← 条件边
+                    │  calls?   │
+                    └────┬─────┘
+                ┌────────┴────────┐
+                ▼                 ▼
+          ┌──────────┐     ┌──────────────┐
+          │   tools   │     │extract_memory│  ← 用 LLM 提取事实
+          │ (执行工具) │     │ (记忆提取)   │     存入记忆库
+          └────┬─────┘     └──────┬───────┘
+               │                  │
+               └──→ call_model    │
+                              │
+                          ┌───▼────┐
+                          │   END   │
+                          └────────┘
+```
+
+- **`call_model`** — 调 `ChatOpenAI`（绑定工具），将回复追加到 messages
+- **`tools`** — 执行 `@tool` 函数，支持搜索次数限制
+- **`extract_memory`** — 用 LLM 从对话中提取事实，通过 `add_or_update` 语义去重后存入记忆
+- **`should_continue`** — 条件边：有 tool_calls → tools，否则 → extract_memory → END
+
+### LangChain 在架构中的角色
+
+LangChain 和 LangGraph 的分工：
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    LangGraph                             │
+│    ┌──────────────────────────────────────────────────┐  │
+│    │  StateGraph                                       │  │
+│    │  ┌──────────┐    ┌──────────┐    ┌─────────────┐ │  │
+│    │  │call_model│ →→ │  tools   │ →→ │extract_mem. │ │  │
+│    │  │          │ ←← │          │    │             │ │  │
+│    │  └─────┬────┘    └──────────┘    └──────┬──────┘ │  │
+│    │        │   ┌──────────────────────────┐ │        │  │
+│    │        └──→│  should_continue(条件边) │─┘        │  │
+│    │            └──────────────────────────┘          │  │
+│    └──────────────────────────────────────────────────┘  │
+│                          │                                │
+│           ┌──────────────┴──────────────┐                 │
+│           ▼                              ▼                │
+│  ┌────────────────┐           ┌──────────────────┐       │
+│  │   LangChain    │           │   LangChain      │       │
+│  │  ChatOpenAI    │           │  @tool 函数       │       │
+│  │  (模型调用)    │           │  (工具执行)       │       │
+│  └────────────────┘           └──────────────────┘       │
+│                                                           │
+│  LangChain 消息层: AIMessage / ToolMessage / SystemMessage│
+│  LangChain 检索层: FAISS + HuggingFaceEmbeddings          │
+└─────────────────────────────────────────────────────────┘
+```
+
+具体组件对应：
+
+| 层面 | 使用的 LangChain 组件 | 所在文件 | 作用 |
+|------|---------------------|---------|------|
+| **模型层** | `ChatOpenAI` | `graph/llm.py` | 统一调用 DeepSeek / OpenAI / Ollama 等 API |
+| **工具层** | `@tool` 装饰器 | `graph/tools.py` | 把普通函数标记为工具，自动生成 tool schema |
+| **消息层** | `AIMessage` / `ToolMessage` / `SystemMessage` / `HumanMessage` | `graph/agent.py` | 标准消息类型，供 `MessagesState` 自动管理 |
+| **检索层** | `FAISS` + `HuggingFaceEmbeddings` | `graph/rag.py` | 文档向量化存储与语义检索 |
+
+LangGraph 在架构中的角色：
+
+| 层面 | 使用的 LangGraph 组件 | 所在文件 | 作用 |
+|------|---------------------|---------|------|
+| **循环控制** | `StateGraph` + 节点 + 条件边 | `graph/agent.py` | 定义 Agent 执行流程（call_model → tools → extract_memory） |
+| **状态管理** | `AgentState(TypedDict)` + `operator.add` reducer | `graph/agent.py` | 自动追加对话历史，不必手动 append |
+| **轨迹记录** | `MemorySaver` checkpointer | `graph/agent.py` | 持久化对话状态，支持多轮会话 |
+
+### LangGraph 多 Agent 编排
+
+`graph/orchestrator.py`：
+
+```
+         supervisor              worker              join
+    ┌──────────────┐      ┌──────────────┐      ┌──────────┐
+    │  用 LLM 分解   │      │  子任务1     │      │ 合并结果  │
+    │  用户请求为    │ ───→ │  子任务2     │ ───→ │ 输出最终  │
+    │  子任务列表    │      │  ...        │      │ 汇总     │
+    └──────────────┘      └──────────────┘      └──────────┘
+                              每个 Worker 内部
+                              是独立 build_agent()
+```
+
+- **`supervisor`** — 用 LLM 将用户请求分解为子任务列表
+- **`worker`** — 对每个子任务调用独立的 `build_agent()` 子图执行
+- **`join`** — 合并所有 Worker 的结果为最终汇总
+
+### 语义记忆去重更新（2026-07-06 新增）
+
+手写版 `memory.py` 和 `graph/memory.py` 同时新增了 `add_or_update()` 方法：
+
+| 相似度 | 判断 | 行为 |
+|--------|------|------|
+| >= 0.85 | 同一事实 | 跳过（已存在） |
+| 0.60 ~ 0.85 | 主体相似但内容不同 | 用新内容替换旧条目 |
+| < 0.60 | 不同事实 | 作为新条目追加 |
+
+解决用户先说"我叫张三"、后说"我的名字是李四"时的记忆冲突问题。
+
 ## 后续计划
 
 - [x] MCP 协议支持
