@@ -1,11 +1,16 @@
 """
-CLI 入口 — 替代手写 react_loop.py 中的 main()
+CLI 入口 — 交互模式 + 单次查询模式 + MCP 连接 + 轨迹记录
 
-交互模式 + 单次查询模式 + MCP 连接
+MCP 连接：启动时自动连接 mcp-server-time（时间查询工具）。
+轨迹记录：每次对话自动保存轨迹 JSON 到 trajectories/ 目录。
 """
 
 import sys
 import os
+import json
+import time
+import glob
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo/
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))                  # graph/
 
@@ -13,16 +18,77 @@ from agent import run as run_agent
 from memory import MEMORY
 from rag import ingest_directory
 
+# MCP 全局客户端列表（供 agent.py 的 tools_node 转发 MCP 调用）
+MCP_CLIENTS = []
+
+# 轨迹目录
+TRAJECTORY_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "trajectories")
+
+
+# ============================================================
+# MCP 连接
+# ============================================================
+
+def _connect_mcp():
+    """启动时连接 MCP 服务器"""
+    global MCP_CLIENTS
+    try:
+        from mcp_client import MCPClient
+        servers = [
+            ["uvx", "mcp-server-time"],
+        ]
+        for cmd_args in servers:
+            try:
+                client = MCPClient(cmd_args[0], cmd_args[1:])
+                client.connect()
+                client.discover_tools()
+                MCP_CLIENTS.append(client)
+                tool_names = [t["name"] for t in client.tools]
+                print(f"  [MCP] 已连接: {', '.join(tool_names)}")
+            except Exception as e:
+                print(f"  [MCP] 连接失败: {e}")
+    except ImportError:
+        print("  [MCP] MCP 客户端未安装，跳过")
+
+
+# ============================================================
+# 轨迹记录
+# ============================================================
+
+def _save_trajectory(query: str, result: str, messages_count: int):
+    """保存对话轨迹到 JSON 文件"""
+    os.makedirs(TRAJECTORY_DIR, exist_ok=True)
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    filename = f"{ts}_graph.json"
+    path = os.path.join(TRAJECTORY_DIR, filename)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "query": query,
+            "result": result,
+            "messages_count": messages_count,
+            "source": "graph",
+        }, f, ensure_ascii=False, indent=2)
+    # 清理旧轨迹（保留最近 100 条）
+    all_files = sorted(glob.glob(os.path.join(TRAJECTORY_DIR, "*_graph.json")))
+    while len(all_files) > 100:
+        os.remove(all_files.pop(0))
+
+
+# ============================================================
+# 主入口
+# ============================================================
 
 def main():
-    """主入口：支持命令行查询和交互模式"""
-    # 启动时索引项目文档到 RAG
     _rag_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     print("[启动] 正在加载 RAG 知识库...")
     try:
         ingest_directory(_rag_dir)
     except Exception as e:
         print(f"[启动] RAG 加载跳过: {e}")
+
+    print("[启动] 正在连接 MCP 服务器...")
+    _connect_mcp()
 
     if len(sys.argv) > 1:
         q = " ".join(sys.argv[1:])
@@ -32,15 +98,14 @@ def main():
 
 
 def _handle_single_query(q: str):
-    """单次查询模式"""
     if "忘记" in q or "删除" in q:
         target = q.split("忘记", 1)[1].strip() if "忘记" in q else q.split("删除", 1)[1].strip()
-        # 只有 target 本身就是"所有"或"全部"时才清空，而不是包含这些词就清空
         if target in ("所有", "全部"):
             MEMORY.clear()
             print("\n[记忆] 已清空所有记忆")
         elif target:
             MEMORY.remove(target)
+        _save_trajectory(q, f"[记忆操作] {'清空' if target in ('所有','全部') else '删除:' + target}", 0)
         return
 
     if "记住" in q:
@@ -64,10 +129,10 @@ def _handle_single_query(q: str):
     result = run_agent(full_q)
     if result:
         print(f"\n最终答案: {result}")
+        _save_trajectory(q, result, 0)
 
 
 def _interactive_mode():
-    """交互式 CLI 模式"""
     print("\n" + "=" * 50)
     print("  LangChain Agent 交互模式")
     print("=" * 50)
