@@ -412,21 +412,26 @@ python orchestrator.py "帮我查时间"    # 多 Agent 编排
 `graph/agent.py` 使用 `StateGraph` 定义 Agent 循环：
 
 ```
-                     call_model
+                    ┌──────────┐
+                    │ call_model│  ← 调 ChatOpenAI（绑定工具）
+                    └────┬─────┘
                          │
-              ┌──────────┴──────────┐
-              │ 条件边:              │
-              │ 有 tool_calls?       │
-              └──────────┬──────────┘
-                    ┌────┴────┐
-                    ▼         ▼
-                 tools    extract_memory
-                    │         │
-                    └──→ call_model
+                    ┌────▼─────┐
+                    │ 有 tool_  │  ← 条件边
+                    │  calls?   │
+                    └────┬─────┘
+                ┌────────┴────────┐
+                ▼                 ▼
+          ┌──────────┐     ┌──────────────┐
+          │   tools   │     │extract_memory│  ← 用 LLM 提取事实
+          │ (执行工具) │     │ (记忆提取)   │     存入记忆库
+          └────┬─────┘     └──────┬───────┘
+               │                  │
+               └──→ call_model    │
                               │
-                         extract_memory
-                              │
-                             END
+                          ┌───▼────┐
+                          │   END   │
+                          └────────┘
 ```
 
 - **`call_model`** — 调 `ChatOpenAI`（绑定工具），将回复追加到 messages
@@ -439,7 +444,14 @@ python orchestrator.py "帮我查时间"    # 多 Agent 编排
 `graph/orchestrator.py`：
 
 ```
-supervisor → worker → join → 输出
+         supervisor              worker              join
+    ┌──────────────┐      ┌──────────────┐      ┌──────────┐
+    │  用 LLM 分解   │      │  子任务1     │      │ 合并结果  │
+    │  用户请求为    │ ───→ │  子任务2     │ ───→ │ 输出最终  │
+    │  子任务列表    │      │  ...        │      │ 汇总     │
+    └──────────────┘      └──────────────┘      └──────────┘
+                              每个 Worker 内部
+                              是独立 build_agent()
 ```
 
 - **`supervisor`** — 用 LLM 将用户请求分解为子任务列表
