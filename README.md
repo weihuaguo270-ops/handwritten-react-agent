@@ -441,12 +441,11 @@ pip install numpy scikit-learn sentence-transformers
 | `react_loop.py` | `StateGraph` 节点 + 条件边 | `graph/agent.py` | ✅ |
 | `orchestrator.py` | `StateGraph` 编排（supervisor → worker → join） | `graph/orchestrator.py` | ✅ |
 | `context.py` | `context_manage_node`（token 估算 + 截断） | `graph/agent.py` | ✅ |
-|| `harness/recorder.py` | 轨迹 JSON 持久化 | `graph/main.py`（基础）+ `graph/harness/recorder.py`（完整） | ✅ |
-|| `harness/sandbox.py` | subprocess 沙箱隔离 + 白名单 | `graph/harness/sandbox.py` | ✅ |
-|| `harness/replay.py` | 轨迹回放 CLI | `graph/harness/replay.py` | ✅ |
-|| `mcp_client.py` | 独立 MCP 客户端（JSON-RPC over stdio） | `graph/mcp.py` | ✅ |
-|| `main() / __main__.py` | CLI 入口（交互 + Harness 记录） | `graph/main.py` | ✅ |
-|| `eval.py` | Agent Eval 评测管线 | `eval/` 包（6 文件，26 条用例） | ✅ |
+| `harness/recorder.py` | 轨迹 JSON 持久化 | `graph/main.py`（基础）+ `graph/harness/recorder.py`（完整） | ✅ |
+| `harness/sandbox.py` | subprocess 沙箱隔离 + 白名单 | `graph/harness/sandbox.py` | ✅ |
+| `harness/replay.py` | 轨迹回放 CLI | `graph/harness/replay.py` | ✅ |
+| `mcp_client.py` | 独立 MCP 客户端（JSON-RPC over stdio） | `graph/mcp.py` | ✅ |
+| `main() / __main__.py` | CLI 入口（交互 + Harness 记录） | `graph/main.py` | ✅ |
 
 **运行方式：**
 ```bash
