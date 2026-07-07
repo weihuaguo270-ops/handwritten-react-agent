@@ -86,7 +86,8 @@ def web_search(query: str) -> str:
 def get_tools():
     """返回所有可用工具的列表"""
     from rag import rag_query as _rag
-    return [get_current_time, calculator, web_search, _rag]
+    from rag import web_rag as _web_rag
+    return [get_current_time, calculator, web_search, _rag, _web_rag]
 
 
 # ============================================================
@@ -98,6 +99,7 @@ TOOL_PROFILES = {
     "calc": {"calculator"},
     "web": {"web_search"},
     "summary": {"rag_query"},
+    "web_rag": {"web_rag"},
 }
 
 
