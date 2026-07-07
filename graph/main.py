@@ -14,6 +14,7 @@ import glob
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo/
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))                  # graph/
 
+from mcp import connect_default_servers
 from agent import run as run_agent
 from memory import MEMORY
 from rag import ingest_directory
@@ -32,23 +33,7 @@ TRAJECTORY_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__
 def _connect_mcp():
     """启动时连接 MCP 服务器"""
     global MCP_CLIENTS
-    try:
-        from mcp_client import MCPClient
-        servers = [
-            ["uvx", "mcp-server-time"],
-        ]
-        for cmd_args in servers:
-            try:
-                client = MCPClient(cmd_args[0], cmd_args[1:])
-                client.connect()
-                client.discover_tools()
-                MCP_CLIENTS.append(client)
-                tool_names = [t["name"] for t in client.tools]
-                print(f"  [MCP] 已连接: {', '.join(tool_names)}")
-            except Exception as e:
-                print(f"  [MCP] 连接失败: {e}")
-    except ImportError:
-        print("  [MCP] MCP 客户端未安装，跳过")
+    MCP_CLIENTS = connect_default_servers()
 
 
 # ============================================================
@@ -126,7 +111,7 @@ def _handle_single_query(q: str):
         memory_context = "\n".join([f"（相关记忆：{m['fact']}）" for m in memories])
 
     full_q = memory_context + q if memory_context else q
-    result = run_agent(full_q)
+    result = run_agent(full_q, mcp_clients=MCP_CLIENTS)
     if result:
         print(f"\n最终答案: {result}")
         _save_trajectory(q, result, 0)

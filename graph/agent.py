@@ -47,9 +47,20 @@ class AgentState(TypedDict):
 # LangGraph 构建
 # ============================================================
 
-def build_agent():
+def build_agent(mcp_clients=None):
 
     tools = get_tools()
+    local_names = {t.name for t in tools}
+    # 合并 MCP 工具（跳过与本地区名的工具）
+    if mcp_clients:
+        for client in mcp_clients:
+            for name, fn in client.to_langchain_tools():
+                if name in local_names:
+                    print(f"  [MCP] 跳过 {name}（已被本地工具覆盖）")
+                    continue
+                from langchain_core.tools import tool
+                wrapped = tool(fn)
+                tools.append(wrapped)
     llm = get_llm().bind_tools(tools)
     tool_map = {t.name: t for t in tools}
     memory_llm = get_llm()  # 记忆提取用的 LLM（不绑定工具）
@@ -233,7 +244,7 @@ def build_agent():
 # 入口函数
 # ============================================================
 
-def run(query: str, max_steps: int = 10, thread_id: str = "default") -> str:
+def run(query: str, max_steps: int = 10, thread_id: str = "default", mcp_clients: list = None) -> str:
     """
     运行单 Agent。
 
@@ -250,7 +261,7 @@ def run(query: str, max_steps: int = 10, thread_id: str = "default") -> str:
     返回:
         最终答案字符串
     """
-    app = build_agent()
+    app = build_agent(mcp_clients=mcp_clients)
     system_prompt = build_system_prompt(query)
 
     config = {"configurable": {"thread_id": thread_id}, "recursion_limit": max_steps + 3}
