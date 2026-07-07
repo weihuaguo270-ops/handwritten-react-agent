@@ -532,11 +532,12 @@ LangGraph 在架构中的角色：
     └──────────────┘      └──────────────┘      └──────────┘
                               每个 Worker 内部
                               是独立 build_agent()
-```
 
-- **`supervisor`** — 用 LLM 将用户请求分解为子任务列表
-- **`worker`** — 对每个子任务调用独立的 `build_agent()` 子图执行
+- **`supervisor`** — 用 LLM 将用户请求分解为子任务列表，分析依赖关系（depends_on）
+- **`worker`** — 按依赖层级执行，同层无依赖的任务并行（ThreadPoolExecutor），有依赖的任务等待前置任务完成后注入上下文再执行
 - **`join`** — 合并所有 Worker 的结果为最终汇总
+
+**Worker 隔离：** 每个 Worker 根据子任务描述（如"计算"、"搜索"）通过 `filter_tools()` 自动筛选只暴露相关工具。例如"计算 2^100"的 Worker 只有 `calculator`，"搜索新闻"的 Worker 只有 `web_search`，互不干扰。
 
 ### 语义记忆去重更新（2026-07-06 新增）
 
