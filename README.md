@@ -388,16 +388,22 @@ pip install numpy scikit-learn sentence-transformers
 
 项目同时提供了 `graph/` 目录下的 **LangChain/LangGraph 全栈版本**，与手写版模块一一对应：
 
-| 手写模块 | LangChain 替代 | 文件 |
-|---------|---------------|------|
-| `llm.py` | `ChatOpenAI`（读 `llm_config.json` 配置） | `graph/llm.py` |
-| `tools/` + `TOOL_REGISTRY` | `@tool` 装饰器 | `graph/tools.py` |
-| `rag.py` | `FAISS` + `HuggingFaceEmbeddings` | `graph/rag.py` |
-| `memory.py` | 语义记忆（同 BGE + LRU，新增语义去重更新） | `graph/memory.py` |
-| `prompts.py` + `cot.py` | `SystemMessage` + PromptTemplate | `graph/prompts.py` |
-| `react_loop.py` | `StateGraph` 节点 + 条件边 | `graph/agent.py` |
-| `orchestrator.py` | `StateGraph` 编排（supervisor → worker → join） | `graph/orchestrator.py` |
-| `main() / __main__.py` | CLI 入口（交互模式 + 单次查询） | `graph/main.py` |
+| 手写模块 | LangChain 替代 | graph/ 文件 | 状态 |
+|---------|---------------|------------|------|
+| `llm.py` | `ChatOpenAI`（读 `llm_config.json` 配置） | `graph/llm.py` | ✅ |
+| `tools/` + `TOOL_REGISTRY` | `@tool` 装饰器 | `graph/tools.py` | ✅ |
+| `rag.py` | `FAISS` + `HuggingFaceEmbeddings` | `graph/rag.py` | ✅ |
+| `memory.py` | 语义记忆（BGE + LRU + 语义去重更新） | `graph/memory.py` | ✅ |
+| `prompts.py` + `cot.py` | 角色模板 + CoT 注入（字符串拼接） | `graph/prompts.py` | ✅ |
+| `react_loop.py` | `StateGraph` 节点 + 条件边 | `graph/agent.py` | ✅ |
+| `orchestrator.py` | `StateGraph` 编排（supervisor → worker → join） | `graph/orchestrator.py` | ✅ |
+| `context.py` | `context_manage_node`（token 估算 + 截断） | `graph/agent.py` | ✅ |
+| `harness/recorder.py` | 轨迹 JSON 持久化 | `graph/main.py` | ✅ |
+| `main() / __main__.py` | CLI 入口（交互 + 单次查询 + MCP 连接） | `graph/main.py` | ✅ |
+| `harness/sandbox.py` | — | — | ⬜ 未移植 |
+| `tot.py` | — | — | ⬜ 未移植 |
+| `planner.py` | — | — | ⬜ 未移植 |
+| `test_all.py` | — | — | ⬜ 未移植 |
 
 **运行方式：**
 ```bash
