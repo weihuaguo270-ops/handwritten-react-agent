@@ -106,31 +106,63 @@ def _fetch_page_text(url: str) -> str:
 
 
 def _search_and_fetch(query: str, top_k: int = 3) -> list:
-    """搜索 + 抓取网页内容"""
+    """用 AnySearch 搜索 + 提取结果"""
     try:
-        # 用 DuckDuckGo 搜索
-        url = f"https://api.duckduckgo.com/?q={urllib.parse.quote(query)}&format=json"
-        with urllib.request.urlopen(url, timeout=10) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
+        max_results = min(max(1, top_k), 5)
+        payload = json.dumps({
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "params": {
+                "name": "search",
+                "arguments": {
+                    "query": query,
+                    "content_types": "news",
+                    "max_results": max_results,
+                    "zone": "intl"
+                }
+            },
+            "id": 1
+        }).encode()
+
+        http_request = urllib.request.Request(
+            "https://api.anysearch.com/mcp",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0"
+            },
+            method="POST"
+        )
+
+        with urllib.request.urlopen(http_request, timeout=15) as resp:
+            data = json.loads(resp.read().decode())
+
+        result_text = data.get("result", {}).get("content", [{}])[0].get("text", "")
+        if not result_text or "Search Results" not in result_text:
+            return []
 
         results = []
-        abstract = data.get("AbstractText", "")
-        if abstract:
-            results.append(("摘要", abstract))
+        current_title = ""
+        current_url = ""
+        for line in result_text.split("\n"):
+            if line.startswith("### "):
+                title = line[4:].strip()
+                title = title.split(". ", 1)[1] if ". " in title else title
+                current_title = title
+            elif line.startswith("- **URL**"):
+                url = line.replace("- **URL**: ", "").strip()
+                current_url = url
+                # 尝试抓取网页内容
+                page_text = _fetch_page_text(url) if url else ""
+                content = page_text if page_text else current_title
+                results.append((url, content[:2000]))
+            elif line.startswith("- ") and not line.startswith("- **"):
+                snippet = line[2:].strip()
+                if snippet and not current_url and current_title:
+                    results.append((current_title, snippet[:2000]))
 
-        related = data.get("RelatedTopics", [])
-        for r in related[:top_k]:
-            if isinstance(r, dict):
-                text = r.get("Text", "")
-                url2 = r.get("FirstURL", "")
-                if text:
-                    # 尝试抓取网页内容
-                    page_text = _fetch_page_text(url2) if url2 else ""
-                    content = page_text if page_text else text
-                    results.append((url2 or "相关结果", content[:2000]))
-
-        return results
-    except Exception as e:
+        return results[:top_k]
+    except Exception:
         return []
 
 

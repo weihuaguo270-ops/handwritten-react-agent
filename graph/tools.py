@@ -55,31 +55,70 @@ def calculator(expression: str) -> str:
 
 
 @tool
-def web_search(query: str) -> str:
-    """搜索互联网获取实时信息。当用户需要实时数据、新闻、或你不知道的信息时使用。
-    
+def web_search(query: str, max_results: int = 3) -> str:
+    """
+    搜索互联网新闻和网页，获取实时信息（基于 AnySearch 搜索引擎）。
+    当用户需要实时数据、新闻、或你不知道的信息时使用。
+
     参数:
         query: 搜索关键词
+        max_results: 返回结果数量（默认3，最大5）
     """
     try:
         import urllib.request
-        import urllib.parse
-        url = f"https://api.duckduckgo.com/?q={urllib.parse.quote(query)}&format=json"
-        with urllib.request.urlopen(url, timeout=10) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            abstract = data.get("AbstractText", "")
-            if abstract:
-                return abstract
-            results = data.get("RelatedTopics", [])
-            if results:
-                parts = []
-                for r in results[:3]:
-                    if isinstance(r, dict) and "Text" in r:
-                        parts.append(r["Text"])
-                return "\n".join(parts) if parts else f"未找到 '{query}' 相关信息"
-            return f"未找到 '{query}' 相关信息"
+        max_results = min(max(1, max_results), 5)
+        payload = json.dumps({
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "params": {
+                "name": "search",
+                "arguments": {
+                    "query": query,
+                    "content_types": "news",
+                    "max_results": max_results,
+                    "zone": "intl"
+                }
+            },
+            "id": 1
+        }).encode()
+
+        http_request = urllib.request.Request(
+            "https://api.anysearch.com/mcp",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0"
+            },
+            method="POST"
+        )
+
+        with urllib.request.urlopen(http_request, timeout=15) as resp:
+            data = json.loads(resp.read().decode())
+
+        result_text = data.get("result", {}).get("content", [{}])[0].get("text", "")
+        if not result_text or "Search Results" not in result_text:
+            return "搜索未找到相关结果"
+
+        results = []
+        idx = 0
+        for line in result_text.split("\n"):
+            if line.startswith("### "):
+                idx += 1
+                title = line[4:].strip()
+                title = title.split(". ", 1)[1] if ". " in title else title
+                results.append(f"{idx}. {title}")
+            elif line.startswith("- **URL**"):
+                url = line.replace("- **URL**: ", "").strip()
+                results.append(f"   链接: {url}")
+            elif line.startswith("- ") and not line.startswith("- **"):
+                snippet = line[2:].strip()
+                if snippet:
+                    results.append(f"   {snippet[:300]}")
+
+        return "\n".join(results) if results else "搜索未找到相关结果"
+
     except Exception as e:
-        return f"搜索失败: {e}"
+        return f"搜索出错: {e}"
 
 
 # 工具函数清单
