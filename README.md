@@ -300,6 +300,29 @@ Harness = Recorder（轨迹记录）+ Sandbox（沙箱隔离）+ Replay（回放
 
 **Dashboard：** 启动后浏览器打开 http://127.0.0.1:5050，左侧对话实时运行，右侧轨迹逐步骤回放，📊 评测页面查看通过率与失败案例。
 
+### Eval 评测管线（eval/）
+
+端到端 Agent 评测系统，替代旧版 `eval.py`：
+
+| 组件 | 文件 | 作用 |
+|------|------|------|
+| 测试用例集 | `eval/dataset.json` | 26 条用例，覆盖 12 个功能模块 |
+| 用例加载器 | `eval/dataset.py` | 从 JSON 加载，支持按 tag 筛选 |
+| 批量执行器 | `eval/runner.py` | subprocess 调 react_loop.py + 集成 Recorder 记录轨迹 |
+| 评分器 | `eval/scorer.py` | 4 维评分：工具匹配 / 内容匹配 / 步数控制 / 答案存在 |
+| 报告生成器 | `eval/report.py` | 汇总报告 → `eval/reports/` 目录 |
+| 统一入口 | `eval/__init__.py` | `python -m eval` 命令行 + EvalRunner API |
+
+**数据流：** 执行 → `trajectories/`（轨迹）→ scorer → `eval/reports/*.json` → Dashboard 📊 页面展示通过率、按 tag 分组统计、失败案例（可点击跳转轨迹回放）。
+
+**CLI 用法：**
+```bash
+python -m eval                       # 全部 26 条
+python -m eval --tag tool_local      # 只测本地工具（30秒快速验证）
+python -m eval --list                # 查看历史报告
+python -m eval --provider openai     # 指定 LLM provider
+```
+
 ### LLM 配置模块（llm.py + llm_config.json）
 
 LLM 调用被抽象为独立模块，支持任意 OpenAI 兼容 API，通过配置文件驱动：
