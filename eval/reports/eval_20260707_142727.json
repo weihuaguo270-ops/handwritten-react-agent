@@ -1,0 +1,62 @@
+{
+  "report_id": "eval_20260707_142727",
+  "timestamp": "2026-07-07T14:27:27",
+  "provider": "test",
+  "summary": {
+    "total": 1,
+    "passed": 1,
+    "failures": 0,
+    "pass_rate": 1.0,
+    "total_score": 4,
+    "max_score": 4,
+    "score_rate": 1.0,
+    "avg_duration": 3.5,
+    "avg_steps": 2.0,
+    "avg_tokens": 0.0
+  },
+  "by_tag": {
+    "unknown": {
+      "total": 1,
+      "passed": 1,
+      "total_duration": 3.5,
+      "pass_rate": 1.0
+    }
+  },
+  "results": [
+    {
+      "case_id": "test",
+      "question": "测试",
+      "tag": null,
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 3.5,
+      "trajectory_file": "",
+      "total_steps": 2,
+      "total_tokens": 0,
+      "score": {
+        "total": 4,
+        "max_score": 4,
+        "passed": true,
+        "details": {
+          "tool_match": {
+            "passed": true,
+            "reason": "命中预期工具: {'calculator'}"
+          },
+          "content_match": {
+            "passed": true,
+            "reason": "命中全部关键词: ['42']"
+          },
+          "step_control": {
+            "passed": true,
+            "reason": "2/5 步"
+          },
+          "has_answer": {
+            "passed": true,
+            "reason": "有最终答案"
+          }
+        }
+      }
+    }
+  ],
+  "failures": []
+}

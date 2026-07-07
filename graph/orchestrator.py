@@ -4,6 +4,9 @@ LangGraph 多 Agent 编排 — supervisor 自带依赖分析
 supervisor: 用 LLM 分解任务 + 分析依赖关系 → 输出带 depends_on 的 Task 列表
 worker:     按依赖层级依次执行（同层并行、层层等待）
 join:       合并结果
+
+Harness 集成：
+  外部传入 Harness 实例，Worker 节点在每次 LLM 调用和工具执行时记录轨迹。
 """
 
 from typing import TypedDict, List, Annotated
@@ -12,62 +15,104 @@ import sys
 import os
 import json
 import re
+import time as _time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo/
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))                  # graph/
 
 from langgraph.graph import StateGraph, END
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage, AIMessage
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from llm import get_llm
 from agent import build_agent
 from tools import filter_tools
 
+from harness import Harness
+
 
 # ============================================================
 # 构建隔离的 Worker
 # ============================================================
 
-def _build_isolated_worker(task_description: str):
+def _build_isolated_worker(task_description: str, harness: Harness | None = None,
+                           parent_step_offset: int = 0):
     """
     根据子任务描述，构建只暴露相关工具的 Agent。
-    
+
     例如"计算 23 * 47"的 Worker 只有 calculator 工具，
     "搜索 Python 教程"的 Worker 只有 web_search 工具。
-    """
-    from langgraph.graph import StateGraph, END, MessagesState
-    from langgraph.checkpoint.memory import MemorySaver
-    from langchain_core.messages import AIMessage, ToolMessage, SystemMessage, HumanMessage
-    from llm import get_llm
-    from tools import filter_tools
-    import json
-    from typing import Literal
 
+    参数:
+        task_description: 子任务描述
+        harness: Harness 实例（可选）。传入后 Worker 的轨迹也会被记录。
+        parent_step_offset: 步号偏移量，避免 Worker step 号和主轨迹 step 冲突。
+    """
     tools = filter_tools(task_description)
     llm = get_llm().bind_tools(tools)
     tool_map = {t.name: t for t in tools}
+    step_counter = [0]
 
-    def call_model(state):
+    def call_model(state, config=None):
+        step_counter[0] += 1
+        current_step = parent_step_offset + step_counter[0]
+
         response = llm.invoke(state["messages"])
+
+        # ── Harness Worker 轨迹 ──
+        h = _get_worker_harness(config)
+        if h:
+            tokens = _estimate_tokens(response)
+            h.record_thought(
+                step=current_step,
+                thought=response.content or "",
+                tokens=tokens,
+            )
+
         return {"messages": [response]}
 
-    def tools_node(state):
+    def tools_node(state, config=None):
         last_msg = state["messages"][-1]
         results = []
+        current_step = parent_step_offset + step_counter[0]
+
+        h = _get_worker_harness(config)
+
         for tc in last_msg.tool_calls:
             name, args, tc_id = tc["name"], tc.get("args", {}), tc["id"]
+            action_start = _time.time()
+
             if name in tool_map:
                 try:
-                    content = str(tool_map[name].invoke(args))
+                    if h and h.is_sandboxed(name):
+                        sandbox_call = {
+                            "function": {"name": name, "arguments": json.dumps(args)},
+                        }
+                        content = h.run_sandboxed(sandbox_call)
+                    else:
+                        content = str(tool_map[name].invoke(args))
                 except Exception as e:
                     content = json.dumps({"error": f"执行错误: {e}"})
             else:
                 content = json.dumps({"error": f"未知工具: {name}"})
+
+            action_duration = _time.time() - action_start
             results.append(ToolMessage(content=content, tool_call_id=tc_id))
+
+            # ── Harness Worker action ──
+            if h:
+                h.record_action(
+                    step=current_step,
+                    action_name=name,
+                    action_args=json.dumps(args, ensure_ascii=False),
+                    observation=content,
+                    duration_seconds=round(action_duration, 3),
+                    tokens=int(len(content) / 4),
+                )
+
         return {"messages": results}
 
-    def should_continue(state) -> Literal["tools", "__end__"]:
+    def should_continue(state) -> str:
         last_msg = state["messages"][-1]
         if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
             return "tools"
@@ -83,6 +128,21 @@ def _build_isolated_worker(task_description: str):
     builder.add_edge("tools", "call_model")
 
     return builder.compile(checkpointer=MemorySaver())
+
+
+def _get_worker_harness(config: dict | None) -> Harness | None:
+    """从 Worker 的 config 中提取 Harness 实例"""
+    if not config:
+        return None
+    return config.get("configurable", {}).get("harness", None)
+
+
+def _estimate_tokens(response) -> int:
+    """粗略估计 token 数（通过 usage_metadata 或 content 长度）"""
+    usage = getattr(response, "usage_metadata", None)
+    if usage and isinstance(usage, dict):
+        return usage.get("total_tokens", 0)
+    return int(len(response.content or "") / 4)
 
 
 # ============================================================
@@ -144,7 +204,6 @@ def supervisor(state: OrchestratorState):
 
     try:
         tasks = json.loads(json_str)
-        # 验证每个 task 的字段
         validated = []
         for t in tasks:
             if isinstance(t, dict) and "id" in t and "description" in t:
@@ -159,12 +218,11 @@ def supervisor(state: OrchestratorState):
                 deps = f"（依赖 #{','.join(t['depends_on'])}）" if t['depends_on'] else "（无依赖）"
                 print(f"  #{t['id']}: {t['description']} {deps}")
             return {"tasks": validated}
-        # 空数组表示不需要拆分
         return {"tasks": []}
     except (json.JSONDecodeError, Exception):
         pass
 
-    return {"tasks": []}  # 解析失败也当不需要拆分处理
+    return {"tasks": []}
 
 
 # ============================================================
@@ -177,11 +235,10 @@ def worker_node(state: OrchestratorState):
     completed_ids = set(state.get("completed_ids", []))
     results = list(state.get("results", []))
 
-    # 构建依赖图
     task_map = {t["id"]: t for t in tasks}
 
     def get_ready_tasks():
-        """返回当前所有前置依赖已完成的任务"""
+        """返回所有前置依赖已完成的任务"""
         ready = []
         for t in tasks:
             tid = t["id"]
@@ -203,6 +260,8 @@ def worker_node(state: OrchestratorState):
         return "\n".join(context_parts) if len(context_parts) > 1 else ""
 
     # 逐层执行
+    step_offset = [0]  # 累积步号偏移
+
     while True:
         ready = get_ready_tasks()
         if not ready:
@@ -210,7 +269,6 @@ def worker_node(state: OrchestratorState):
 
         level_results = {}
         if len(ready) == 1:
-            # 单个任务直接执行
             t = ready[0]
             context = build_context(t)
             full_task = f"{t['description']}\n\n{context}" if context else t['description']
@@ -218,7 +276,6 @@ def worker_node(state: OrchestratorState):
             level_results[t["id"]] = f"[#{t['id']}] {t['description']}\n{answer}"
             print(f"  [完成] #{t['id']}: {t['description'][:50]}")
         else:
-            # 多个任务并行执行
             def run_one(t):
                 ctx = build_context(t)
                 ft = f"{t['description']}\n\n{ctx}" if ctx else t['description']
@@ -232,7 +289,6 @@ def worker_node(state: OrchestratorState):
                     level_results[tid] = result
                     print(f"  [完成] #{tid}: {futures[f]['description'][:50]}")
 
-        # 更新完成状态
         for tid, result in level_results.items():
             completed_ids.add(tid)
             results.append(result)

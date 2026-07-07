@@ -1,9 +1,13 @@
 """
-Agent Eval — 自动化评测框架
+[已弃用] 旧版 Agent Eval — 请使用 eval/ 包替代
+
 用法：
-    python eval.py                          # 使用默认 provider
-    python eval.py --provider openai         # 切换到 OpenAI
-    python eval.py --provider ollama         # 使用本地 Ollama
+    python -m eval                          # 运行全部测试
+    python -m eval --tag local              # 只运行本地工具类
+    python -m eval --list                   # 列出历史报告
+    python -m eval --provider openai        # 切换 provider
+
+旧版保留以兼容引用，但不再维护。
 """
 import subprocess, sys, re, json, os
 

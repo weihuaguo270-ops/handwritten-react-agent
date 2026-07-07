@@ -10,12 +10,17 @@ LangGraph 单 Agent — 纯 LangChain 生态版本
   call_model → (条件边) → tools → call_model（循环）
       │
       └── 无 tool_calls → context_manage → extract_memory → END
+
+Harness 集成：
+  通过 config["configurable"]["harness"] 传入 Harness 实例。
+  call_model 节点自动记录 thought。
+  tools_node 节点自动记录每个 action 的 name/args/observation/duration。
 """
 
 import json
 import sys
 import os
-from typing import Literal, TypedDict, Annotated, List
+from typing import Literal, TypedDict, Annotated, List, Any, Optional
 import operator
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo/
@@ -30,6 +35,9 @@ from tools import get_tools
 from prompts import build_system_prompt
 from memory import MEMORY
 from context import manage as manage_context
+
+# Harness 集成
+from harness import Harness
 
 
 # ============================================================
@@ -47,7 +55,13 @@ class AgentState(TypedDict):
 # LangGraph 构建
 # ============================================================
 
-def build_agent(mcp_clients=None):
+def build_agent(mcp_clients=None, harness: "Harness | None" = None):
+    """构建 LangGraph Agent
+
+    参数:
+        mcp_clients: MCP 客户端列表（可选）
+        harness: Harness 实例（可选）。传入后自动记录轨迹。
+    """
 
     tools = get_tools()
     local_names = {t.name for t in tools}
@@ -64,8 +78,9 @@ def build_agent(mcp_clients=None):
     llm = get_llm().bind_tools(tools)
     tool_map = {t.name: t for t in tools}
     memory_llm = get_llm()  # 记忆提取用的 LLM（不绑定工具）
+    step_counter = [0]  # 闭包可变引用——用列表绕过 int 不可变
 
-    def call_model(state: AgentState):
+    def call_model(state: AgentState, config: dict | None = None):
         """
         调 LLM 节点。
 
@@ -74,14 +89,25 @@ def build_agent(mcp_clients=None):
 
         参数:
             state: 当前 Agent 状态
-
-        返回:
-            {"messages": [AIMessage]} — messages 通过 operator.add reducer 自动追加
+            config: LangGraph 运行时配置，可选。含 {"configurable": {"harness": Harness}}
         """
+        step_counter[0] += 1
+        current_step = step_counter[0]
+
         llm_response = llm.invoke(state["messages"])
+
+        # ── Harness 记录 thought ──
+        h = _get_harness(config)
+        if h:
+            thought_content = llm_response.content or ""
+            tokens = 0
+            if hasattr(llm_response, "usage_metadata") and llm_response.usage_metadata:
+                tokens = llm_response.usage_metadata.get("total_tokens", 0)
+            h.record_thought(step=current_step, thought=thought_content, tokens=tokens)
+
         return {"messages": [llm_response]}
 
-    def tools_node(state: AgentState):
+    def tools_node(state: AgentState, config: dict | None = None):
         """
         执行工具调用节点。
 
@@ -90,37 +116,69 @@ def build_agent(mcp_clients=None):
 
         参数:
             state: 当前 Agent 状态（从 messages[-1] 读取 tool_calls）
-
-        返回:
-            {"messages": [ToolMessage, ...], "search_count": int}
+            config: LangGraph 运行时配置，可选。含 {"configurable": {"harness": Harness}}
         """
         last_msg = state["messages"][-1]
         results = []
         search_count = state.get("search_count", 0)
+        current_step = step_counter[0]
+
+        # ── Harness 实例 ──
+        h = _get_harness(config)
 
         for tool_call in last_msg.tool_calls:
             tool_name, tool_args, tool_call_id = tool_call["name"], tool_call.get("args", {}), tool_call["id"]
+            import time as _time
+            action_start = _time.time()
 
             if tool_name in ("web_search",) and search_count >= 4:
                 content = "搜索已达上限，请基于已有信息回答"
+                action_duration = _time.time() - action_start
             else:
                 if tool_name in tool_map:
                     try:
-                        content = str(tool_map[tool_name].invoke(tool_args))
+                        # ── 沙箱检查：是否在子进程执行 ──
+                        if h and h.is_sandboxed(tool_name):
+                            sandbox_call = {
+                                "function": {
+                                    "name": tool_name,
+                                    "arguments": json.dumps(tool_args),
+                                }
+                            }
+                            content = h.run_sandboxed(sandbox_call)
+                        else:
+                            content = str(tool_map[tool_name].invoke(tool_args))
+
+                        action_duration = _time.time() - action_start
                         if tool_name in ("web_search",):
                             search_count += 1
                     except Exception as e:
                         content = json.dumps({"error": f"执行错误: {e}"})
+                        action_duration = _time.time() - action_start
                 elif tool_name == "rag_query":
                     from rag import rag_query
                     try:
                         content = rag_query.invoke(tool_args)
+                        action_duration = _time.time() - action_start
                     except Exception as e:
                         content = json.dumps({"error": f"RAG错误: {e}"})
+                        action_duration = _time.time() - action_start
                 else:
                     content = json.dumps({"error": f"未知工具: {tool_name}"})
+                    action_duration = _time.time() - action_start
 
             results.append(ToolMessage(content=content, tool_call_id=tool_call_id))
+
+            # ── Harness 记录 action ──
+            if h:
+                h.record_action(
+                    step=current_step,
+                    action_name=tool_name,
+                    action_args=json.dumps(tool_args, ensure_ascii=False),
+                    observation=content,
+                    duration_seconds=round(action_duration, 3),
+                    tokens=int(len(content) / 4),  # 粗略估计 tokens
+                )
 
         return {"messages": results, "search_count": search_count}
 
@@ -130,12 +188,6 @@ def build_agent(mcp_clients=None):
 
         - 有 tool_calls → 返回 "tools"，继续工具循环
         - 无 tool_calls → 返回 "context_manage"，执行上下文检查后再到记忆提取
-
-        参数:
-            state: 当前 Agent 状态
-
-        返回:
-            "tools" 或 "context_manage"
         """
         last_msg = state["messages"][-1]
         if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
@@ -148,12 +200,6 @@ def build_agent(mcp_clients=None):
 
         在 Agent 循环结束时检查消息总长度。超限时按策略处理：
         truncate / drop / summarize（具体逻辑在 graph/context.py 中）。
-
-        参数:
-            state: 当前 Agent 状态
-
-        返回:
-            {"messages": [...], "search_count": int}
         """
         search_count = state.get("search_count", 0)
         managed_messages, action = manage_context(state["messages"])
@@ -167,14 +213,6 @@ def build_agent(mcp_clients=None):
 
         Agent 循环结束后，用 LLM 从对话中提取事实性信息，
         通过 add_or_update 存入记忆系统（语义去重 + 冲突替换）。
-
-        作为 LangGraph 节点运行，不依赖外部函数。全部逻辑在节点内完成。
-
-        参数:
-            state: 最终 Agent 状态（含完整对话历史和 user_query）
-
-        返回:
-            {} — 不修改状态，只产生副作用（写入 memory.json）
         """
         user_query = state.get("user_query", "")
         answer = ""
@@ -241,10 +279,26 @@ def build_agent(mcp_clients=None):
 
 
 # ============================================================
+# 辅助函数
+# ============================================================
+
+def _get_harness(config: dict | None) -> Harness | None:
+    """从 LangGraph config 中提取 Harness 实例
+
+    config 结构由 LangGraph 传入：
+        {"configurable": {"harness": Harness(), ...}}
+    """
+    if not config:
+        return None
+    return config.get("configurable", {}).get("harness", None)
+
+
+# ============================================================
 # 入口函数
 # ============================================================
 
-def run(query: str, max_steps: int = 10, thread_id: str = "default", mcp_clients: list = None) -> str:
+def run(query: str, max_steps: int = 10, thread_id: str = "default",
+        mcp_clients: list = None, harness: Harness | None = None) -> str:
     """
     运行单 Agent。
 
@@ -257,14 +311,22 @@ def run(query: str, max_steps: int = 10, thread_id: str = "default", mcp_clients
         query: 用户问题
         max_steps: 最大迭代步数（默认 10）
         thread_id: LangGraph checkpoint 线程 ID
+        mcp_clients: MCP 客户端列表（可选）
+        harness: Harness 实例（可选）。传入后自动记录轨迹。
 
     返回:
         最终答案字符串
     """
-    app = build_agent(mcp_clients=mcp_clients)
+    app = build_agent(mcp_clients=mcp_clients, harness=harness)
     system_prompt = build_system_prompt(query)
 
-    config = {"configurable": {"thread_id": thread_id}, "recursion_limit": max_steps + 3}
+    config = {
+        "configurable": {
+            "thread_id": thread_id,
+            "harness": harness,  # 传入 Harness 供节点函数使用
+        },
+        "recursion_limit": max_steps + 3,
+    }
     result = app.invoke({
         "messages": [
             SystemMessage(content=system_prompt),
@@ -284,12 +346,6 @@ def _extract_answer(result: dict) -> str:
     倒序遍历消息列表：
     1. 优先匹配 FINAL ANSWER: 标记后面的文本
     2. 无标记则返回最后一条非空消息的 content
-
-    参数:
-        result: LangGraph invoke 返回的状态字典（含 messages 列表）
-
-    返回:
-        提取的答案字符串，未找到时返回空字符串
     """
     import re
     for m in reversed(result["messages"]):

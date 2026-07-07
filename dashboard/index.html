@@ -3,114 +3,168 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent 交互 + 轨迹查看器</title>
+<title>Agent 交互 + 轨迹查看器 + Eval 评测</title>
 <style>
-:root{--bg:#f4f5f7;--card:#fff;--border:#e0e2e6;--text:#1a1d23;--muted:#6b7280;--accent:#3b82f6;--accent-hover:#2563eb;--green:#22c55e;--green-bg:#f0fdf4;--orange:#f59e0b;--radius:8px}
+:root{--bg:#f4f5f7;--card:#fff;--border:#e0e2e6;--text:#1a1d23;--muted:#6b7280;--accent:#3b82f6;--accent-hover:#2563eb;--green:#22c55e;--green-bg:#f0fdf4;--red:#ef4444;--red-bg:#fef2f2;--orange:#f59e0b;--orange-bg:#fff7ed;--radius:8px}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;font-size:14px}
 .layout{display:flex;height:100vh}
-/* 左侧：聊天 */
-.chat-panel{width:420px;min-width:420px;display:flex;flex-direction:column;background:var(--card);border-right:1px solid var(--border)}
-.chat-header{padding:14px 18px;border-bottom:1px solid var(--border);font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px}
-.chat-header .sub{font-weight:400;font-size:12px;color:var(--muted)}
-.chat-messages{flex:1;overflow-y:auto;padding:12px 16px}
-.msg{margin-bottom:12px;display:flex;flex-direction:column}
+/* 左侧聊天 */
+.chat-panel{width:380px;min-width:380px;display:flex;flex-direction:column;background:var(--card);border-right:1px solid var(--border)}
+.chat-header{padding:12px 16px;border-bottom:1px solid var(--border);font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;justify-content:space-between}
+.chat-header .sub{font-weight:400;font-size:11px;color:var(--muted)}
+.tabs{display:flex;border-bottom:1px solid var(--border);background:#fafbfc;flex-shrink:0}
+.tab{padding:8px 14px;font-size:12px;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);user-select:none}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.tab-content{flex:1;overflow:hidden;display:none;flex-direction:column}
+.tab-content.active{display:flex}
+.chat-messages{flex:1;overflow-y:auto;padding:10px 14px}
+.msg{margin-bottom:10px;display:flex;flex-direction:column}
 .msg.user{align-items:flex-end}
 .msg.assistant{align-items:flex-start}
-.msg-bubble{max-width:90%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
-.msg.user .msg-bubble{background:var(--accent);color:#fff;border-bottom-right-radius:4px}
-.msg.assistant .msg-bubble{background:#f0f2f5;color:var(--text);border-bottom-left-radius:4px}
-.msg.assistant .msg-bubble.thinking{background:#fff7ed;color:#92400e;font-style:italic}
-.msg-meta{font-size:11px;color:var(--muted);margin-top:2px;padding:0 4px}
-.chat-input-area{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px}
-.chat-input-area textarea{flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:8px;resize:none;font-size:13px;outline:0;font-family:inherit;min-height:44px;max-height:120px}
-.chat-input-area textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(59,130,246,.15)}
-.chat-input-area button{padding:10px 18px;border:none;background:var(--accent);color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;white-space:nowrap}
+.msg-bubble{max-width:92%;padding:8px 12px;border-radius:10px;font-size:12.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.msg.user .msg-bubble{background:var(--accent);color:#fff;border-bottom-right-radius:3px}
+.msg.assistant .msg-bubble{background:#f0f2f5;color:var(--text);border-bottom-left-radius:3px}
+.msg-meta{font-size:10px;color:var(--muted);margin-top:2px;padding:0 4px}
+.chat-input-area{padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:6px}
+.chat-input-area textarea{flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:6px;resize:none;font-size:12.5px;outline:0;font-family:inherit;min-height:38px;max-height:100px}
+.chat-input-area textarea:focus{border-color:var(--accent)}
+.chat-input-area button{padding:8px 14px;border:none;background:var(--accent);color:#fff;border-radius:6px;cursor:pointer;font-size:12.5px;font-weight:500}
 .chat-input-area button:hover{background:var(--accent-hover)}
 .chat-input-area button:disabled{opacity:.5;cursor:not-allowed}
-.chat-input-area .status{font-size:11px;color:var(--muted);align-self:center;white-space:nowrap}
-/* 右侧：主区（顶部轨迹信息 + 下面回放） */
+/* 右侧主区 */
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.main-header{padding:10px 20px;border-bottom:1px solid var(--border);background:var(--card);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px}
-.main-header .query-display{font-weight:600;font-size:14px}
+.main-header{padding:8px 18px;border-bottom:1px solid var(--border);background:var(--card);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px;font-size:13px}
+.main-header .query-display{font-weight:600;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .main-header .meta-display{font-size:11px;color:var(--muted)}
-.main-header .actions{display:flex;gap:6px}
-.btn{padding:5px 12px;border:1px solid var(--border);background:var(--card);border-radius:6px;cursor:pointer;font-size:12px}
+.main-header .actions{display:flex;gap:4px}
+.btn{padding:4px 10px;border:1px solid var(--border);background:var(--card);border-radius:5px;cursor:pointer;font-size:11.5px}
 .btn:hover{background:#f0f2f5}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
 .btn-primary:hover{background:var(--accent-hover)}
 .btn-green{background:var(--green);color:#fff;border-color:var(--green)}
-.btn-green:hover{background:#16a34a}
-/* 右侧内容 */
-.content{flex:1;overflow-y:auto;padding:16px 20px}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
-.stat-card{background:var(--card);border-radius:var(--radius);padding:10px 14px;text-align:center}
-.stat-card .label{font-size:10px;color:var(--muted);margin-bottom:2px}
-.stat-card .value{font-size:16px;font-weight:700}
-.step-card{background:var(--card);border-radius:var(--radius);margin-bottom:12px;overflow:hidden}
-.step-hd{padding:10px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;background:#fafbfc;border-bottom:1px solid var(--border);user-select:none}
+.btn-danger{background:var(--red);color:#fff;border-color:var(--red)}
+/* 右侧内容区 */
+.content{flex:1;overflow-y:auto;padding:14px 18px}
+/* 轨迹页面 */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.stat-card{background:var(--card);border-radius:var(--radius);padding:8px 12px;text-align:center}
+.stat-card .label{font-size:10px;color:var(--muted)}
+.stat-card .value{font-size:15px;font-weight:700}
+.step-card{background:var(--card);border-radius:var(--radius);margin-bottom:10px;overflow:hidden;border:1px solid var(--border)}
+.step-hd{padding:8px 12px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;background:#fafbfc;border-bottom:1px solid var(--border);user-select:none}
 .step-hd:hover{background:#f0f2f5}
-.step-hd .sn{font-weight:600;font-size:13px}
+.step-hd .sn{font-weight:600;font-size:12.5px}
 .step-hd .sm{font-size:11px;color:var(--muted);display:flex;gap:6px;align-items:center}
-.step-bd{padding:14px;display:none}
+.step-bd{padding:12px;display:none}
 .step-bd.open{display:block}
-.tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:500;margin-bottom:4px}
+.tag{display:inline-block;font-size:10px;padding:1px 5px;border-radius:3px;font-weight:500;margin-bottom:3px}
 .tag-thought{background:#eef2ff;color:#4f46e5}
-.tag-tool{background:#fff7ed;color:#c2410c}
+.tag-tool{background:var(--orange-bg);color:#c2410c}
 .tag-result{background:var(--green-bg);color:#16a34a}
-.thought-block{background:#f8fafc;border-radius:6px;padding:10px;margin:6px 0;font-size:13px;line-height:1.6;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,monospace}
-.tool-block{background:#fff7ed;border-radius:6px;padding:8px 10px;margin:6px 0;font-family:ui-monospace,SFMono-Regular,monospace;font-size:12px}
+.thought-block{background:#f8fafc;border-radius:5px;padding:8px;margin:4px 0;font-size:12.5px;line-height:1.6;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,monospace}
+.tool-block{background:var(--orange-bg);border-radius:5px;padding:6px 8px;margin:4px 0;font-family:ui-monospace,SFMono-Regular,monospace;font-size:11.5px}
 .tool-block .tn{color:#c2410c;font-weight:600}
-.result-block{background:var(--green-bg);border-radius:6px;padding:8px 10px;margin:6px 0;font-family:ui-monospace,SFMono-Regular,monospace;font-size:12px;color:#166534;max-height:180px;overflow-y:auto;white-space:pre-wrap}
+.result-block{background:var(--green-bg);border-radius:5px;padding:6px 8px;margin:4px 0;font-family:ui-monospace,SFMono-Regular,monospace;font-size:11.5px;color:#166534;max-height:150px;overflow-y:auto;white-space:pre-wrap}
 .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:50vh;color:var(--muted)}
-.empty-state .icon{font-size:40px;margin-bottom:8px}
-.empty-state .text{font-size:14px}
+.empty-state .icon{font-size:36px;margin-bottom:6px}
+.empty-state .text{font-size:13px}
+/* 轨迹列表 */
+.traj-list{overflow-y:auto;flex:1}
+.traj-item{padding:8px 14px;border-bottom:1px solid #f0f0f0;cursor:pointer;font-size:12px}
+.traj-item:hover{background:#f5f7fa}
+.traj-item .q{font-weight:500;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.traj-item .m{font-size:10.5px;color:var(--muted)}
+/* Eval 页面 */
+.eval-header{display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.eval-header select{padding:5px 10px;border:1px solid var(--border);border-radius:5px;font-size:12px}
+.eval-summary-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:16px}
+.eval-report-list{overflow-y:auto}
+.eval-report-item{padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;cursor:pointer;background:var(--card);display:flex;justify-content:space-between;align-items:center}
+.eval-report-item:hover{box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.eval-report-item .ri{font-size:12.5px}
+.eval-report-item .rm{font-size:11px;color:var(--muted)}
+.eval-failure-item{padding:8px 12px;border-left:3px solid var(--red);background:var(--red-bg);border-radius:4px;margin-bottom:6px;font-size:12.5px;cursor:pointer}
+.eval-failure-item:hover{opacity:.9}
+.eval-trajectory-link{color:var(--accent);cursor:pointer;text-decoration:underline;font-size:11.5px}
+/* 进度条 */
+.progress-bar{height:3px;background:#e5e7eb;border-radius:2px;margin:8px 0;overflow:hidden}
+.progress-bar .fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s}
 </style>
 </head>
 <body>
 <div class="layout">
-  <!-- 左侧聊天 -->
   <div class="chat-panel">
-    <div class="chat-header">💬 Agent 聊天 <span class="sub">输入问题实时运行</span></div>
-    <div class="chat-messages" id="chat-messages"></div>
-    <div class="chat-input-area">
-      <textarea id="chat-input" rows="1" placeholder="输入问题，按 Ctrl+Enter 发送..." onkeydown="if(e.ctrlKey&&e.key==='Enter')sendQuery()"></textarea>
-      <button id="chat-send" onclick="sendQuery()">发送</button>
-      <span class="status" id="chat-status"></span>
+    <div class="chat-header">💬 Agent <span class="sub">输入问题实时运行</span></div>
+    <div class="tabs" id="left-tabs">
+      <div class="tab active" data-tab="chat" onclick="switchLeftTab('chat')">对话</div>
+      <div class="tab" data-tab="traj-list" onclick="switchLeftTab('traj-list')">历史</div>
+    </div>
+    <!-- 对话 Tab -->
+    <div class="tab-content active" id="tab-chat">
+      <div class="chat-messages" id="chat-messages"></div>
+      <div class="chat-input-area">
+        <textarea id="chat-input" rows="1" placeholder="输入问题，Ctrl+Enter 发送..."></textarea>
+        <button id="chat-send" onclick="sendQuery()">发送</button>
+      </div>
+    </div>
+    <!-- 轨迹列表 Tab -->
+    <div class="tab-content" id="tab-traj-list">
+      <div style="padding:8px 14px;font-size:11.5px;color:var(--muted);border-bottom:1px solid var(--border);display:flex;justify-content:space-between">
+        <span id="traj-count">0 条轨迹</span>
+        <span style="cursor:pointer;color:var(--accent)" onclick="refreshTrajList()">🔄</span>
+      </div>
+      <div class="traj-list" id="traj-list"></div>
     </div>
   </div>
-  <!-- 右侧轨迹 -->
+
   <div class="main">
     <div class="main-header">
-      <div><span class="query-display" id="current-query">等待输入...</span><br><span class="meta-display" id="current-meta"></span></div>
+      <div>
+        <span class="query-display" id="current-query">等待输入...</span>
+        <span class="meta-display" id="current-meta" style="display:block;margin-top:2px"></span>
+      </div>
       <div class="actions">
         <button class="btn" id="btn-prev" disabled onclick="prevStep()">←</button>
         <button class="btn btn-primary" id="btn-play" onclick="togglePlay()">▶ 播放</button>
         <button class="btn" id="btn-next" disabled onclick="nextStep()">→</button>
-        <button class="btn" onclick="showClearDialog()">🗑️</button>
-        <button class="btn" onclick="shutdownServer()">⏻</button>
+        <button class="btn" onclick="showDialog('clear-dialog')">🗑️</button>
       </div>
     </div>
-    <div class="content" id="viewer">
-      <div class="empty-state"><div class="icon">📂</div><div class="text">从左侧输入问题开始</div></div>
+    <!-- 右侧 Tab 导航 -->
+    <div class="tabs" id="right-tabs">
+      <div class="tab active" data-tab="trajectory" onclick="switchRightTab('trajectory')">📂 轨迹</div>
+      <div class="tab" data-tab="eval" onclick="switchRightTab('eval');loadEvalReports()">📊 评测</div>
+    </div>
+
+    <!-- 轨迹回放区 -->
+    <div class="content tab-content active" id="tab-trajectory">
+      <div class="empty-state" id="empty-state"><div class="icon">📂</div><div class="text">从左侧输入问题开始</div></div>
+      <div id="trajectory-viewer" style="display:none"></div>
+    </div>
+
+    <!-- Eval 评测区 -->
+    <div class="content tab-content" id="tab-eval">
+      <div class="empty-state" id="eval-empty"><div class="icon">📊</div><div class="text">暂无评测数据，请先运行一次评测</div></div>
+      <div id="eval-content" style="display:none"></div>
     </div>
   </div>
 </div>
 
-<div id="clear-dialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:100;align-items:center;justify-content:center" onclick="if(event.target===this)hideClearDialog()">
-  <div style="background:#fff;border-radius:12px;padding:24px;min-width:360px;box-shadow:0 4px 20px rgba(0,0,0,.15)">
-    <h3 style="margin-bottom:12px">🗑️ 清理轨迹文件</h3>
-    <div style="font-size:13px;color:#666;margin-bottom:16px">
-      轨迹文件保留在 <code>trajectories/</code> 目录，删除后不可恢复。
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:16px">
+<!-- 清理弹窗 -->
+<div id="clear-dialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:100;align-items:center;justify-content:center" onclick="if(event.target===this)hideDialog('clear-dialog')">
+  <div style="background:#fff;border-radius:12px;padding:24px;min-width:340px;box-shadow:0 4px 20px rgba(0,0,0,.15)">
+    <h3 style="margin-bottom:12px;font-size:15px">🗑️ 清理轨迹文件</h3>
+    <div style="font-size:12.5px;color:#666;margin-bottom:14px">轨迹文件保留在 trajectories/ 目录，删除后不可恢复。</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
       <button class="btn" onclick="doClear(0)" style="flex:1">全部删除</button>
-      <button class="btn" onclick="doClear(7)" style="flex:1">保留近7天</button>
-      <button class="btn" onclick="doClear(30)" style="flex:1">保留近30天</button>
+      <button class="btn" onclick="doClear(7)" style="flex:1">保留7天</button>
+      <button class="btn" onclick="doClear(30)" style="flex:1">保留30天</button>
     </div>
-    <div id="clear-result" style="font-size:12px;color:#666;margin-bottom:12px"></div>
-    <button class="btn" onclick="hideClearDialog()" style="width:100%">取消</button>
+    <div id="clear-result" style="font-size:12px;color:#666;margin-bottom:10px"></div>
+    <button class="btn" onclick="hideDialog('clear-dialog')" style="width:100%">取消</button>
   </div>
 </div>
 
@@ -121,10 +175,20 @@ let currentStep = 0;
 let playTimer = null;
 let isRunning = false;
 
-// ===== 工具 =====
 const esc = s => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML };
 
-// ===== 发送查询 =====
+// ===== Tab 切换 =====
+function switchLeftTab(name) {
+  document.querySelectorAll('#left-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('.chat-panel .tab-content').forEach(t => t.classList.toggle('active', t.id===`tab-${name}`));
+  if (name==='traj-list') loadTrajList();
+}
+function switchRightTab(name) {
+  document.querySelectorAll('#right-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('.main .tab-content').forEach(t => t.classList.toggle('active', t.id===`tab-${name}`));
+}
+
+// ===== 对话 =====
 document.getElementById('chat-input').addEventListener('keydown', e => {
   if (e.ctrlKey && e.key === 'Enter') sendQuery();
 });
@@ -134,15 +198,12 @@ async function sendQuery() {
   const query = input.value.trim();
   if (!query || isRunning) return;
 
-  // 清输入、禁用按钮
   input.value = '';
   document.getElementById('chat-send').disabled = true;
-  document.getElementById('chat-status').textContent = '运行中...';
   isRunning = true;
 
-  // 添加到聊天
   appendMsg('user', query);
-  const assistantId = appendMsg('assistant', '思考中...', true);
+  const assistantId = appendMsg('assistant', '思考中...');
 
   try {
     const res = await fetch('/api/chat', {
@@ -153,51 +214,80 @@ async function sendQuery() {
     const data = await res.json();
 
     if (data.error) {
-      updateMsg(assistantId, `❌ 错误: ${data.error}`, false);
+      updateMsg(assistantId, `❌ 错误: ${data.error}`);
     } else {
-      updateMsg(assistantId, data.stdout || '(无输出)', false);
-      // 加载轨迹
+      updateMsg(assistantId, data.stdout || '(无输出)');
       if (data.trajectory) {
         currentData = data.trajectory;
         currentStep = 0;
         updateHeader();
         updateButtons();
         renderTrajectory();
-        loadList();       // 刷新左侧轨迹列表，新记录会显示在顶部
+        switchLeftTab('chat');
+        switchRightTab('trajectory');
       }
     }
   } catch (err) {
-    updateMsg(assistantId, `❌ 请求失败: ${err.message}`, false);
+    updateMsg(assistantId, `❌ 请求失败: ${err.message}`);
   }
 
   document.getElementById('chat-send').disabled = false;
-  document.getElementById('chat-status').textContent = '';
   isRunning = false;
 }
 
-function appendMsg(role, text, thinking=false) {
+function appendMsg(role, text) {
   const el = document.getElementById('chat-messages');
   const div = document.createElement('div');
   div.className = `msg ${role}`;
-  const cls = thinking ? 'msg-bubble thinking' : 'msg-bubble';
-  div.innerHTML = `<div class="${cls}">${esc(text)}</div><div class="msg-meta">${new Date().toLocaleTimeString()}</div>`;
+  div.innerHTML = `<div class="msg-bubble">${esc(text)}</div><div class="msg-meta">${new Date().toLocaleTimeString()}</div>`;
   div.dataset.id = Date.now() + Math.random();
   el.appendChild(div);
   el.scrollTop = el.scrollHeight;
   return div.dataset.id;
 }
 
-function updateMsg(id, text, thinking) {
+function updateMsg(id, text) {
   const el = document.querySelector(`[data-id="${id}"] .msg-bubble`);
-  if (el) { el.textContent = text; el.className = thinking ? 'msg-bubble thinking' : 'msg-bubble'; }
+  if (el) el.textContent = text;
 }
 
-// ===== 渲染轨迹 =====
+// ===== 轨迹列表 =====
+async function loadTrajList() {
+  try {
+    const res = await fetch('/api/trajectories');
+    const list = await res.json();
+    document.getElementById('traj-count').textContent = `${list.length} 条轨迹`;
+    const el = document.getElementById('traj-list');
+    el.innerHTML = list.slice(0, 200).map(t => `
+      <div class="traj-item" onclick="loadTrajectory('${t.name}')">
+        <div class="q">${esc(t.query||'(空)')}</div>
+        <div class="m">${t.timestamp||''}  🤖 ${t.model||'?'}  📊 ${t.steps||0}步  ⏱ ${(t.duration||0).toFixed(1)}s</div>
+      </div>
+    `).join('');
+  } catch(e) {
+    document.getElementById('traj-list').innerHTML = '<div style="padding:14px;color:var(--red)">加载失败</div>';
+  }
+}
+
+async function loadTrajectory(name) {
+  try {
+    const res = await fetch(`/api/trajectories/${name}`);
+    currentData = await res.json();
+    currentStep = 0;
+    updateHeader();
+    updateButtons();
+    renderTrajectory();
+    switchLeftTab('chat');
+    switchRightTab('trajectory');
+  } catch(e) {}
+}
+
+// ===== 轨迹渲染 =====
 function updateHeader() {
   if (!currentData) return;
   document.getElementById('current-query').textContent = currentData.query || '(空)';
   document.getElementById('current-meta').textContent =
-    `🆔 ${currentData.session_id||''}  🤖 ${currentData.model||''}  ⏱ ${currentData.total_duration_seconds||0}s  💰 ~${currentData.total_tokens_estimated||0}t`;
+    `🆔 ${currentData.session_id||''}  🤖 ${currentData.model||''}  ⏱ ${(currentData.total_duration_seconds||0).toFixed(1)}s  💰 ~${currentData.total_tokens_estimated||0}t`;
 }
 
 function updateButtons() {
@@ -208,52 +298,72 @@ function updateButtons() {
 }
 
 function renderTrajectory() {
-  const viewer = document.getElementById('viewer');
+  const viewer = document.getElementById('trajectory-viewer');
+  const empty = document.getElementById('empty-state');
   const d = currentData;
-  if (!d) return;
+  if (!d) { viewer.style.display='none'; empty.style.display='flex'; return; }
+  empty.style.display='none'; viewer.style.display='block';
+
   const steps = d.steps || [];
+  const actions = d.actions || [];
 
   // 统计
   let html = `<div class="stats">
     <div class="stat-card"><div class="label">步骤</div><div class="value">${steps.length}</div></div>
     <div class="stat-card"><div class="label">耗时</div><div class="value">${(d.total_duration_seconds||0).toFixed(1)}s</div></div>
-    <div class="stat-card"><div class="label">Token</div><div class="value">~${((d.total_tokens_estimated||0)/1000).toFixed(1)}k</div></div>
-    <div class="stat-card"><div class="label">当前</div><div class="value">${currentStep+1}/${steps.length}</div></div>
+    <div class="stat-card"><div class="label">Token</div><div class="value">~${Math.round((d.total_tokens_estimated||0)/1000)}k</div></div>
+    <div class="stat-card"><div class="label">当前</div><div class="value">${currentStep+1}/${Math.max(steps.length,1)}</div></div>
   </div>`;
 
   // 步骤卡片
   steps.forEach((s, idx) => {
     const stepNum = s.step || idx + 1;
-    const thought = s.thought || s.content || '';
-    const action = s.action || {};
-    const obs = s.observation || s.result || '';
     const isOpen = idx === currentStep ? ' open' : '';
-    const dur = s.duration_seconds || '';
+    const dur = s.duration_seconds ? s.duration_seconds+'s' : '';
+    const toolCalls = s.actions || [];
 
     html += `<div class="step-card">
       <div class="step-hd" onclick="this.nextElementSibling.classList.toggle('open')">
         <span class="sn">步骤 ${stepNum}</span>
-        <span class="sm">${dur ? dur+'s' : ''} ${idx===currentStep ? '◀ 当前' : ''}</span>
+        <span class="sm">${dur} ${toolCalls.length ? toolCalls.length+'个工具' : ''} ${idx===currentStep?'◀':''}</span>
       </div>
       <div class="step-bd${isOpen}">`;
 
+    const thought = s.thought || s.content || '';
     if (thought) {
       html += `<span class="tag tag-thought">💭 思考</span><div class="thought-block">${esc(thought)}</div>`;
     }
-    if (action.name) {
-      html += `<span class="tag tag-tool">🔧 ${esc(action.name)}</span><div class="tool-block"><span class="tn">${esc(action.name)}</span>(<span class="ta">${esc(JSON.stringify(action.arguments||{}))}</span>)</div>`;
+
+    if (toolCalls.length) {
+      toolCalls.forEach((a, ai) => {
+        const obs = a.observation || a.result || '';
+        html += `<span class="tag tag-tool">🔧 [${ai+1}] ${esc(a.name)}</span>
+          <div class="tool-block"><span class="tn">${esc(a.name)}</span>(${esc(a.arguments||'')})</div>`;
+        if (obs) {
+          html += `<span class="tag tag-result">📥 返回</span>
+            <div class="result-block">${esc(obs.substring(0,500))}${obs.length>500?'<br><em>...(截断)</em>':''}</div>`;
+        }
+      });
     }
-    if (obs) {
-      html += `<span class="tag tag-result">📥 返回</span><div class="result-block">${esc(obs.substring(0,500))}${obs.length>500?'<br><em>...(截断)</em>':''}</div>`;
+
+    // 兼容旧格式（单 action）
+    if (!toolCalls.length && s.action && s.action.name) {
+      const obs = s.observation || s.result || '';
+      html += `<span class="tag tag-tool">🔧 ${esc(s.action.name)}</span>
+        <div class="tool-block"><span class="tn">${esc(s.action.name)}</span>(${esc(JSON.stringify(s.action.arguments||{}))})</div>`;
+      if (obs) {
+        html += `<span class="tag tag-result">📥 返回</span>
+          <div class="result-block">${esc(obs.substring(0,500))}${obs.length>500?'<br><em>...(截断)</em>':''}</div>`;
+      }
     }
+
     html += `</div></div>`;
   });
 
-  // 最终答案
   if (d.final_answer) {
-    html += `<div style="background:var(--green-bg);border:1px solid #86efac;border-radius:var(--radius);padding:14px;margin-top:12px">
-      <div style="font-size:11px;color:#16a34a;font-weight:600;margin-bottom:4px">🎯 最终答案</div>
-      <div style="font-size:14px;line-height:1.6;white-space:pre-wrap">${esc(d.final_answer)}</div>
+    html += `<div style="background:var(--green-bg);border:1px solid #86efac;border-radius:var(--radius);padding:12px;margin-top:10px">
+      <div style="font-size:11px;color:#16a34a;font-weight:600;margin-bottom:3px">🎯 最终答案</div>
+      <div style="font-size:13px;line-height:1.6;white-space:pre-wrap">${esc(d.final_answer)}</div>
     </div>`;
   }
 
@@ -261,65 +371,224 @@ function renderTrajectory() {
 }
 
 // ===== 步骤导航 =====
-function prevStep() {
-  if (currentStep>0) { currentStep--; updateButtons(); renderTrajectory(); }
-}
-function nextStep() {
-  if (currentData && currentStep<(currentData.steps||[]).length-1) { currentStep++; updateButtons(); renderTrajectory(); }
-}
+function prevStep() { if (currentStep>0) { currentStep--; updateButtons(); renderTrajectory(); } }
+function nextStep() { if (currentData && currentStep<(currentData.steps||[]).length-1) { currentStep++; updateButtons(); renderTrajectory(); } }
 function togglePlay() {
   const btn = document.getElementById('btn-play');
-  if (playTimer) {
-    clearInterval(playTimer); playTimer=null;
-    btn.textContent='▶ 播放'; btn.className='btn btn-primary';
-    return;
-  }
+  if (playTimer) { clearInterval(playTimer); playTimer=null; btn.textContent='▶ 播放'; btn.className='btn btn-primary'; return; }
   btn.textContent='⏸ 暂停'; btn.className='btn btn-green';
   playTimer = setInterval(() => {
     if (!currentData || currentStep>=(currentData.steps||[]).length-1) {
       clearInterval(playTimer); playTimer=null;
-      btn.textContent='▶ 播放'; btn.className='btn btn-primary';
-      return;
+      btn.textContent='▶ 播放'; btn.className='btn btn-primary'; return;
     }
     currentStep++; updateButtons(); renderTrajectory();
   }, 1500);
 }
 
-// ===== 清理轨迹弹窗 =====
-function showClearDialog() {
-  document.getElementById('clear-dialog').style.display = 'flex';
-  document.getElementById('clear-result').textContent = '';
-}
-function hideClearDialog() {
-  document.getElementById('clear-dialog').style.display = 'none';
-}
+// ===== 清理轨迹 =====
+function showDialog(id) { document.getElementById(id).style.display='flex'; }
+function hideDialog(id) { document.getElementById(id).style.display='none'; }
 async function doClear(days) {
-  const btn = event.target;
-  const originalText = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = '清理中...';
+  document.getElementById('clear-result').textContent = '清理中...';
   try {
-    const res = await fetch('/api/trajectories/clear', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({days}),
-    });
+    const res = await fetch('/api/trajectories/clear', { method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify({days}) });
     const data = await res.json();
-    document.getElementById('clear-result').textContent = data.message || data.error || '清理完成';
-    loadList();  // 刷新左侧列表
-  } catch (err) {
-    document.getElementById('clear-result').textContent = '请求失败: ' + err.message;
-  }
-  btn.disabled = false;
-  btn.textContent = originalText;
+    document.getElementById('clear-result').textContent = data.message;
+    loadTrajList();
+  } catch(e) { document.getElementById('clear-result').textContent='请求失败'; }
 }
-async function shutdownServer() {
-  if (!confirm('确认关闭 Dashboard 服务？')) return;
+
+// ===== Eval 评测页面 =====
+let currentEvalReport = null;
+
+async function loadEvalReports() {
+  const content = document.getElementById('eval-content');
+  const empty = document.getElementById('eval-empty');
+
   try {
-    await fetch('/api/shutdown', {method:'POST'});
-    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-size:18px;color:#666">Dashboard 已关闭，可关闭此页面</div>';
-  } catch(e) {}
+    const res = await fetch('/api/eval/reports');
+    const reports = await res.json();
+
+    if (!reports.length) {
+      empty.style.display='flex';
+      content.style.display='none';
+      content.innerHTML = '';
+      return;
+    }
+
+    empty.style.display='none';
+    content.style.display='block';
+    currentEvalReport = null;
+
+    // 最新报告摘要
+    const latest = reports[0];
+    const s = latest.summary;
+
+    let html = `<div class="eval-header">
+      <span style="font-weight:600;font-size:14px">📊 评测结果</span>
+      <span style="font-size:12px;color:var(--muted)">${latest.timestamp}  |  Provider: ${latest.provider}</span>
+      <button class="btn btn-primary" onclick="runNewEval()" style="margin-left:auto">▶ 运行评测</button>
+    </div>`;
+
+    // 概要卡片
+    html += `<div class="eval-summary-cards">
+      <div class="stat-card"><div class="label">通过率</div><div class="value" style="color:${s.pass_rate>=0.7?'var(--green)':'var(--red)'}">${(s.pass_rate*100).toFixed(0)}%</div></div>
+      <div class="stat-card"><div class="label">评分率</div><div class="value">${(s.score_rate*100).toFixed(0)}%</div></div>
+      <div class="stat-card"><div class="label">通过/总数</div><div class="value">${s.passed}/${s.total}</div></div>
+      <div class="stat-card"><div class="label">平均耗时</div><div class="value">${s.avg_duration}s</div></div>
+      <div class="stat-card"><div class="label">平均步数</div><div class="value">${s.avg_steps}</div></div>
+      <div class="stat-card"><div class="label">平均Tokens</div><div class="value">~${Math.round(s.avg_tokens)}</div></div>
+    </div>`;
+
+    // 按 tag 分组
+    const tags = latest.by_tag || {};
+    const tagKeys = Object.keys(tags);
+    if (tagKeys.length) {
+      html += `<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">`;
+      for (const [tag, st] of Object.entries(tags)) {
+        const rate = st.pass_rate || 0;
+        html += `<div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px">
+          <strong>${tag}</strong>: ${st.passed}/${st.total} (${(rate*100).toFixed(0)}%)
+        </div>`;
+      }
+      html += `</div>`;
+    }
+
+    // 历史报告列表
+    html += `<div style="font-size:13px;font-weight:600;margin:14px 0 8px">历史报告</div>
+      <div class="eval-report-list">`;
+    reports.forEach((r, i) => {
+      const s2 = r.summary;
+      html += `<div class="eval-report-item" onclick="viewEvalReport('${r.report_id}')">
+        <div>
+          <div class="ri"><strong>#${i+1}</strong>  ${r.timestamp}  |  ${r.provider}</div>
+          <div class="rm">通过: ${s2.passed}/${s2.total} (${(s2.pass_rate*100).toFixed(0)}%)  |  评分: ${s2.score_rate*100|0}%  |  耗时: ${s2.avg_duration}s</div>
+        </div>
+        <span style="color:var(--muted);font-size:11px">${s2.total} 条</span>
+      </div>`;
+    });
+    html += `</div>`;
+
+    // 最新报告的失败案例（如果有）
+    if (latest.report_id) {
+      const detailRes = await fetch(`/api/eval/reports/${latest.report_id}`);
+      const detail = await detailRes.json();
+      const failures = detail.failures || [];
+      if (failures.length) {
+        html += `<div style="font-size:13px;font-weight:600;margin:14px 0 8px">❌ 失败案例 (${failures.length})</div>`;
+        failures.forEach(f => {
+          const reasons = Object.values(f.score.details||{}).filter(d=>!d.passed).map(d=>d.reason).join('; ');
+          html += `<div class="eval-failure-item" onclick="viewFailureTrajectory('${latest.report_id}','${f.case_id}')">
+            <strong>${esc(f.case_id)}</strong>: ${esc(reasons)}<br>
+            <span class="eval-trajectory-link">📂 查看轨迹回放</span>
+            <span style="float:right;font-size:11px;color:var(--muted)">${f.duration_seconds}s / ${f.total_steps||'?'}步</span>
+          </div>`;
+        });
+      }
+    }
+
+    content.innerHTML = html;
+
+  } catch(e) {
+    empty.style.display='flex';
+    empty.innerHTML = '<div class="icon">⚠️</div><div class="text">加载评测数据失败，请先运行一次评测</div>';
+    content.style.display='none';
+  }
 }
+
+async function viewEvalReport(reportId) {
+  try {
+    const res = await fetch(`/api/eval/reports/${reportId}`);
+    const report = await res.json();
+    currentEvalReport = report;
+
+    // 显示详细报告
+    const content = document.getElementById('eval-content');
+    const s = report.summary;
+
+    let html = `<div class="eval-header">
+      <span style="font-weight:600;font-size:14px">📊 ${report.report_id}</span>
+      <span style="font-size:12px;color:var(--muted)">${report.timestamp}  |  ${report.provider}</span>
+      <button class="btn" onclick="loadEvalReports()" style="margin-left:auto">← 返回列表</button>
+    </div>`;
+
+    html += `<div class="eval-summary-cards">
+      <div class="stat-card"><div class="label">通过率</div><div class="value" style="color:${s.pass_rate>=0.7?'var(--green)':'var(--red)'}">${(s.pass_rate*100).toFixed(0)}%</div></div>
+      <div class="stat-card"><div class="label">评分率</div><div class="value">${(s.score_rate*100).toFixed(0)}%</div></div>
+      <div class="stat-card"><div class="label">通过/总数</div><div class="value">${s.passed}/${s.total}</div></div>
+      <div class="stat-card"><div class="label">平均耗时</div><div class="value">${s.avg_duration}s</div></div>
+    </div>`;
+
+    // 全部结果列表
+    html += `<div style="font-size:13px;font-weight:600;margin:14px 0 8px">用例详情 (${report.results.length})</div>`;
+    report.results.forEach(r => {
+      const passed = r.score.passed;
+      const reasons = Object.entries(r.score.details||{}).map(([k,v]) =>
+        v.passed ? `✅ ${k}` : `❌ ${k}: ${v.reason}`
+      ).join('<br>');
+      html += `<div style="background:var(--card);border:1px solid ${passed?'var(--green)':'var(--red)'};border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>${esc(r.case_id)}</strong>
+          <span style="font-size:11px;color:var(--muted)">${r.duration_seconds}s / ${r.total_steps||'?'}步 / ~${r.total_tokens||0}t</span>
+        </div>
+        <div style="color:var(--muted);margin:2px 0 4px">${esc(r.question)}</div>
+        <div style="font-size:11px">${reasons}</div>
+        ${r.trajectory_file ? `<span class="eval-trajectory-link" onclick="viewFailureTrajectory('${report.report_id}','${r.case_id}')">📂 查看轨迹</span>` : ''}
+      </div>`;
+    });
+
+    content.innerHTML = html;
+
+  } catch(e) {
+    alert('加载报告详情失败');
+  }
+}
+
+async function viewFailureTrajectory(reportId, caseId) {
+  try {
+    const res = await fetch(`/api/eval/reports/${reportId}/trajectory/${caseId}`);
+    if (!res.ok) { alert('该用例无轨迹文件'); return; }
+    currentData = await res.json();
+    currentStep = 0;
+    updateHeader();
+    updateButtons();
+    renderTrajectory();
+    switchRightTab('trajectory');
+  } catch(e) {
+    alert('获取轨迹失败');
+  }
+}
+
+async function runNewEval() {
+  if (!confirm('将运行所有测试用例（大约3-10分钟），继续？')) return;
+
+  const content = document.getElementById('eval-content');
+  content.innerHTML = `
+    <div style="padding:20px;text-align:center">
+      <div style="font-size:16px;margin-bottom:8px">⏳ 评测运行中...</div>
+      <div class="progress-bar"><div class="fill" style="width:100%;animation:pulse 1.5s infinite"></div></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:8px">每条约30-120秒，请耐心等待</div>
+    </div>
+    <style>
+      @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    </style>
+  `;
+
+  try {
+    const res = await fetch('/api/eval/run', { method:'POST',
+      headers:{'Content-Type':'application/json'}, body:'{}' });
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+    await loadEvalReports();
+  } catch(e) {
+    alert('评测运行失败');
+  }
+}
+
+// ===== 初始化 =====
+loadTrajList();
 </script>
 </body>
 </html>

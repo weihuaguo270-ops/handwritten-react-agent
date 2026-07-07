@@ -1,0 +1,255 @@
+[
+  {
+    "id": "get_time",
+    "question": "现在几点了？",
+    "expected_tools": ["get_time", "get_current_time"],
+    "must_contain": ["2026"],
+    "max_steps": 6,
+    "timeout": 60,
+    "tag": "tool_local",
+    "description": "本地时间工具"
+  },
+  {
+    "id": "calculator_simple",
+    "question": "计算 (23 + 45) * 2 等于多少",
+    "expected_tools": ["calculator"],
+    "must_contain": ["136"],
+    "max_steps": 6,
+    "timeout": 60,
+    "tag": "tool_local",
+    "description": "AST 安全计算器"
+  },
+  {
+    "id": "calculator_multi",
+    "question": "计算 (123+456)*2 和 789/3 分别是多少",
+    "expected_tools": ["calculator"],
+    "must_contain": ["1158", "263"],
+    "max_steps": 6,
+    "timeout": 60,
+    "tag": "tool_local",
+    "description": "多步计算（同一工具调多次）"
+  },
+  {
+    "id": "calculator_divide",
+    "question": "计算 100 / 7 等于多少",
+    "expected_tools": ["calculator"],
+    "must_contain": ["14.2"],
+    "max_steps": 4,
+    "timeout": 60,
+    "tag": "tool_local",
+    "description": "除法精度"
+  },
+  {
+    "id": "calculator_chain",
+    "question": "先告诉我时间，再计算 100 / 7",
+    "expected_tools": ["get_time", "get_current_time", "calculator"],
+    "must_contain": ["2026", "14."],
+    "max_steps": 8,
+    "timeout": 90,
+    "tag": "tool_multi",
+    "description": "多工具链式调用"
+  },
+  {
+    "id": "web_search",
+    "question": "搜索一下2026年AI Agent的最新发展",
+    "expected_tools": ["web_search"],
+    "must_contain": ["AI", "Agent"],
+    "max_steps": 8,
+    "timeout": 120,
+    "tag": "tool_web",
+    "description": "网络搜索（AnySearch）"
+  },
+  {
+    "id": "web_and_fetch",
+    "question": "搜索AI Agent的维基百科词条，打开第一条结果，然后总结内容（用中文）",
+    "expected_tools": ["web_search", "fetch_page", "summarize"],
+    "must_contain": ["Agent"],
+    "timeout": 120,
+    "tag": "tool_web",
+    "description": "搜索→抓取→摘要链路"
+  },
+  {
+    "id": "rag_react_loop",
+    "question": "这个项目里 react_loop.py 是做什么的？",
+    "expected_tools": ["rag_query", "search_files", "read_text_file"],
+    "must_contain": ["ReAct"],
+    "max_steps": 6,
+    "timeout": 60,
+    "tag": "rag",
+    "description": "RAG 检索项目文档"
+  },
+  {
+    "id": "rag_file_location",
+    "question": "项目的 RAG 模块在哪个文件？",
+    "expected_tools": ["rag_query", "search_files", "read_text_file", "list_directory", "directory_tree", "get_file_info", "list_allowed_directories"],
+    "must_contain": ["rag.py"],
+    "max_steps": 6,
+    "timeout": 60,
+    "tag": "rag",
+    "description": "RAG 定位代码文件"
+  },
+  {
+    "id": "rag_memory_module",
+    "question": "memory.py 模块的类名叫什么？",
+    "expected_tools": ["rag_query", "search_files", "read_text_file"],
+    "must_contain": ["Memory"],
+    "max_steps": 6,
+    "timeout": 60,
+    "tag": "rag",
+    "description": "RAG 检索代码细节"
+  },
+  {
+    "id": "mcp_timezone",
+    "question": "现在东京时间是多少？",
+    "expected_tools": ["get_current_time", "convert_time", "get_time", "web_search"],
+    "must_contain": ["2026"],
+    "max_steps": 6,
+    "timeout": 90,
+    "tag": "mcp",
+    "description": "MCP 时区转换工具"
+  },
+  {
+    "id": "role_code_review",
+    "question": "帮我审查这段代码有什么问题：def add(a,b): return a+b",
+    "must_contain": ["code_reviewer"],
+    "must_contain_any": ["类型", "PEP", "类型注解", "隐患", "建议"],
+    "max_steps": 4,
+    "timeout": 60,
+    "tag": "prompts",
+    "description": "角色自动选择：代码审查"
+  },
+  {
+    "id": "role_debater",
+    "question": "对比一下Python和JavaScript的优缺点",
+    "must_contain": ["debater"],
+    "must_contain_any": ["优点", "缺点", "优势", "劣势"],
+    "max_steps": 4,
+    "timeout": 60,
+    "tag": "prompts",
+    "description": "角色自动选择：辩论"
+  },
+  {
+    "id": "role_tutor",
+    "question": "请解释一下机器学习中的过拟合是什么",
+    "must_contain": ["tutor"],
+    "must_contain_any": ["过拟合", "overfitting", "模型", "训练"],
+    "max_steps": 4,
+    "timeout": 60,
+    "tag": "prompts",
+    "description": "角色自动选择：教学"
+  },
+  {
+    "id": "cot_math",
+    "question": "小明有 5 个苹果，给了小红 2 个，又买了 3 个，现在有几个？",
+    "must_contain_any": ["6", "思路", "逐步", "步骤"],
+    "max_steps": 4,
+    "timeout": 60,
+    "tag": "cot",
+    "description": "CoT 思维链：数学推理"
+  },
+  {
+    "id": "cot_logic",
+    "question": "如果所有的 A 都是 B，所有的 B 都是 C，那么 A 和 C 的关系是什么？",
+    "must_contain_any": ["A 是 C", "A属于C", "包含"],
+    "max_steps": 4,
+    "timeout": 60,
+    "tag": "cot",
+    "description": "CoT 思维链：逻辑推理"
+  },
+  {
+    "id": "context_strategy",
+    "question": "切换上下文管理策略为 truncate",
+    "expected_tools": ["switch_context_strategy"],
+    "must_contain": ["truncate"],
+    "max_steps": 3,
+    "timeout": 60,
+    "tag": "context",
+    "description": "运行时切换上下文策略"
+  },
+  {
+    "id": "memory_remember",
+    "question": "记住我叫张三",
+    "expected_tools": ["rag_query", "add_memory"],
+    "must_contain_any": ["记住", "已记住", "张三"],
+    "max_steps": 4,
+    "timeout": 60,
+    "tag": "memory",
+    "description": "记忆系统：主动记住信息"
+  },
+  {
+    "id": "memory_recall",
+    "question": "我叫什么名字？",
+    "must_contain_any": ["张"],
+    "max_steps": 4,
+    "timeout": 60,
+    "tag": "memory",
+    "description": "记忆系统：回忆信息（依赖上一条记忆）"
+  },
+  {
+    "id": "orchestrator_simple",
+    "question": "同时帮我查一下今天的时间，并计算 50*30",
+    "tag": "orchestrator",
+    "expected_tools": ["get_time", "get_current_time", "calculator"],
+    "must_contain_any": ["[Orchestrator]", "层级", "子任务", "Level", "并行", "依赖"],
+    "max_steps": 8,
+    "timeout": 90,
+    "description": "Orchestrator 多 Agent 编排：并行任务"
+  },
+  {
+    "id": "memory_autosave",
+    "question": "我喜欢看科幻电影",
+    "must_contain_any": ["记住", "已记住", "记忆", "科幻"],
+    "max_steps": 4,
+    "timeout": 60,
+    "tag": "memory",
+    "description": "记忆系统：自动记忆（AutoExtract）"
+  },
+  {
+    "id": "rollback_agent",
+    "question": "切换成 research_assistant 角色",
+    "expected_tools": ["switch_role"],
+    "must_contain_any": ["research", "已切换"],
+    "max_steps": 3,
+    "timeout": 60,
+    "tag": "prompts",
+    "description": "角色运行时切换"
+  },
+  {
+    "id": "context_check",
+    "question": "查看当前上下文使用情况",
+    "expected_tools": ["switch_context_strategy"],
+    "must_contain_any": ["context", "上下文", "token", "策略"],
+    "max_steps": 4,
+    "timeout": 60,
+    "tag": "context",
+    "description": "上下文状态检查"
+  },
+  {
+    "id": "cot_structured",
+    "question": "请用结构化的方式分析新能源汽车的优缺点",
+    "must_contain_any": ["优势", "劣势", "优点", "缺点", "方面"],
+    "max_steps": 5,
+    "timeout": 60,
+    "tag": "cot",
+    "description": "CoT：结构化思考框架"
+  },
+  {
+    "id": "harness_sandbox",
+    "question": "开启工具沙箱隔离",
+    "expected_tools": ["toggle_sandbox"],
+    "must_contain": ["开启", "已开启", "沙箱"],
+    "max_steps": 3,
+    "timeout": 60,
+    "tag": "harness",
+    "description": "沙箱隔离开关"
+  },
+  {
+    "id": "planner",
+    "question": "帮我规划一个学习Python的计划，分3步",
+    "must_contain_any": ["[Plan]", "步骤", "计划", "规划", "Task"],
+    "max_steps": 8,
+    "timeout": 90,
+    "tag": "planner",
+    "description": "Planner 任务规划"
+  }
+]
