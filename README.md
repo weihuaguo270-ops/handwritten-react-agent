@@ -399,6 +399,7 @@ pip install numpy scikit-learn sentence-transformers
 | `orchestrator.py` | `StateGraph` 编排（supervisor → worker → join） | `graph/orchestrator.py` | ✅ |
 | `context.py` | `context_manage_node`（token 估算 + 截断） | `graph/agent.py` | ✅ |
 | `harness/recorder.py` | 轨迹 JSON 持久化 | `graph/main.py` | ✅ |
+| `mcp_client.py` | 独立 MCP 客户端（JSON-RPC over stdio） | `graph/mcp.py` | ✅ |
 | `main() / __main__.py` | CLI 入口（交互 + 单次查询 + MCP 连接） | `graph/main.py` | ✅ |
 | `harness/sandbox.py` | — | — | ⬜ 未移植 |
 | `tot.py` | — | — | ⬜ 未移植 |
@@ -453,7 +454,18 @@ python orchestrator.py "帮我查时间"    # 多 Agent 编排
 
 ### MCP 连接
 
-启动时自动连接 `mcp-server-time` 等 MCP 服务器，工具列表合并到 LLM 的工具定义中。
+启动时通过 `graph/mcp.py` 自动连接 `mcp-server-time` 等 MCP 服务器，工具列表合并到 LLM 的工具定义中。同名工具自动跳过（本地优先）。
+
+### 工具列表
+
+| 工具 | 来源 | 功能 |
+|------|------|------|
+| `get_current_time` | 本地 `@tool` | 系统时间 |
+| `calculator` | 本地 `@tool` | 数学计算（AST 安全解析） |
+| `web_search` | AnySearch API | 搜索互联网新闻和网页 |
+| `web_rag` | AnySearch + 网页抓取 | 搜索并返回网页全文内容 |
+| `rag_query` | 本地 FAISS 索引 | 本地项目文档语义检索 |
+| `convert_time` | MCP (`mcp-server-time`) | 时区转换 |
 
 ### 轨迹记录
 
