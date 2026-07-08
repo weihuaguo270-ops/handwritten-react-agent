@@ -1,12 +1,17 @@
 """
 沙箱隔离模块 — 在子进程中执行工具调用
 
+三策略模式：
+  - off:  全部在当前进程执行（最快，适合本地开发）
+  - auto: 自动判断——safe 工具直接跑，io/cpu 工具走子进程（默认）
+  - on:   全部走子进程（最安全，适合运行不可信代码）
+
 每种工具在独立的 Python 子进程中运行，带超时保护。
 工具崩溃时不会影响主进程，超时时返回错误提示。
 
 用法:
     from sandbox import Sandbox
-    sandbox = Sandbox(timeout=30)
+    sandbox = Sandbox(strategy="auto", timeout=30)
     result = sandbox.run(tool_call_dict)
 """
 
@@ -19,6 +24,70 @@ import textwrap
 # _sandbox_runner.py 的路径（和 sandbox.py 同目录）
 _RUNNER_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_sandbox_runner.py")
 
+
+# ============================================================
+# 工具风险等级标签（按类别判断）
+# ============================================================
+
+RISK_SAFE = "safe"  # 0ms 纯本地，不可能崩溃（时间、计算、开关类配置）
+RISK_IO = "io"      # 网络/文件 IO，可能超时（搜索、抓取、RAG、清理）
+RISK_CPU = "cpu"    # 纯计算但可能耗时长或卡住（ToT 内部多轮调 LLM）
+
+
+def classify_risk(tool_name: str) -> str:
+    """根据工具名判断风险等级
+
+    返回 RISK_SAFE / RISK_IO / RISK_CPU 之一。
+    未知工具默认走 io（走沙箱），宁可多隔离也不漏掉。
+    """
+    safe_tools = {
+        "get_time", "get_current_time",
+        "calculator",
+        "switch_cot_strategy", "switch_role", "switch_context_strategy",
+        "toggle_sandbox",
+        "start_dashboard",
+    }
+    io_tools = {
+        "web_search", "fetch_page",
+        "rag_query",
+        "clear_trajectories",
+    }
+    cpu_tools = {
+        "summarize",
+        "tot_reasoning",
+    }
+    if tool_name in safe_tools:
+        return RISK_SAFE
+    if tool_name in io_tools:
+        return RISK_IO
+    if tool_name in cpu_tools:
+        return RISK_CPU
+    # 未知工具: 默认 safe（不走沙箱），因为可能是 MCP/HTTP 等外部工具
+    return RISK_SAFE
+
+
+def should_sandbox_by_risk(tool_name: str, strategy: str) -> bool:
+    """根据策略和工具名判断是否走沙箱
+
+    参数:
+        tool_name: 工具名
+        strategy:  "off" / "auto" / "on"
+
+    返回:
+        True=走子进程，False=直接执行
+    """
+    if strategy == "on":
+        return True
+    if strategy == "off":
+        return False
+    # auto 模式：只对 safe 工具跳过沙箱
+    risk = classify_risk(tool_name)
+    return risk in (RISK_IO, RISK_CPU)
+
+
+# ============================================================
+# 子进程 runner 确保
+# ============================================================
 
 def _ensure_runner():
     """确保子进程运行脚本存在"""
@@ -64,22 +133,36 @@ def _ensure_runner():
             f.write(runner_code)
 
 
+# ============================================================
+# Sandbox 类
+# ============================================================
+
+VALID_STRATEGIES = ("off", "auto", "on")
+
+
 class Sandbox:
     """工具沙箱——在子进程中执行工具，带超时保护
 
+    三策略模式：
+      - "off":  全部在当前进程执行（最快）
+      - "auto": 自动判断（默认）——safe 工具直接跑，io/cpu 工具走子进程
+      - "on":   全部走子进程（最安全）
+
     用法:
-        sandbox = Sandbox(timeout=30)
+        sandbox = Sandbox(strategy="auto", timeout=30)
         result = sandbox.run({
             "function": {"name": "calculator", "arguments": '{"expression": "1+1"}'}
         })
     """
 
-    def __init__(self, timeout: int = 30, enabled: bool = True, prewarm: bool = True):
+    def __init__(self, timeout: int = 30, strategy: str = "auto", prewarm: bool = True):
+        if strategy not in VALID_STRATEGIES:
+            raise ValueError(f"未知沙箱策略: {strategy}，可选: {VALID_STRATEGIES}")
         self.timeout = timeout
-        self.enabled = enabled
+        self.strategy = strategy
         self._prewarmed = False
         _ensure_runner()
-        if prewarm and enabled:
+        if prewarm and strategy != "off":
             self._prewarm()
 
     def _prewarm(self):
@@ -99,8 +182,25 @@ class Sandbox:
             self._prewarmed = False
 
     @property
+    def enabled(self) -> bool:
+        """兼容旧接口：返回当前是否处于可执行子进程的状态"""
+        return self.strategy != "off"
+
+    @enabled.setter
+    def enabled(self, value: bool):
+        """兼容旧接口：set enabled=True → 切 auto，enabled=False → 切 off"""
+        self.strategy = "auto" if value else "off"
+
+    @property
     def warm_status(self) -> str:
         return "已预热" if self._prewarmed else "未预热"
+
+    def should_sandbox(self, tool_name: str) -> bool:
+        """对外暴露：判断某个工具是否应当在沙箱中执行
+
+        LangGraph 版的 Sandbox 也有同名方法，保持接口一致。
+        """
+        return should_sandbox_by_risk(tool_name, self.strategy)
 
     def run(self, tool_call: dict) -> str:
         """在子进程中执行工具调用
@@ -109,10 +209,12 @@ class Sandbox:
             tool_call: 标准的 LLM tool_call 字典
 
         返回:
-            工具执行结果的字符串
+            工具执行结果的字符串；跳过时返回 "__SANDBOX_DISABLED__"
         """
-        if not self.enabled:
-            # 沙箱关闭时直接返回标识，由 react_loop 自行执行
+        tool_name = tool_call.get("function", {}).get("name", "")
+
+        # auto 模式下，safe 工具跳过沙箱
+        if not should_sandbox_by_risk(tool_name, self.strategy):
             return "__SANDBOX_DISABLED__"
 
         payload = json.dumps(tool_call, ensure_ascii=False)
@@ -133,24 +235,24 @@ class Sandbox:
 
             if result.returncode != 0:
                 stderr = result.stderr.strip()[:200]
-                return f"[沙箱] 工具执行失败: {stderr}"
+                return f"[沙箱] 工具 '{tool_name}' 执行失败: {stderr}"
 
             output = result.stdout.strip()
-            return output if output else "(工具无返回)"
+            return output if output else f"(工具 '{tool_name}' 无返回)"
 
         except subprocess.TimeoutExpired:
-            return f"[沙箱] 工具执行超时（{self.timeout}秒）"
+            return f"[沙箱] 工具 '{tool_name}' 执行超时（{self.timeout}秒）"
         except FileNotFoundError:
             return f"[沙箱] 找不到 Python 解释器"
         except Exception as e:
-            return f"[沙箱] 异常: {e}"
+            return f"[沙箱] 工具 '{tool_name}' 异常: {e}"
 
 
 # ============================================================
-# 全局实例（默认关闭沙箱，供 react_loop.py 导入后启用）
+# 全局实例（默认 auto 模式）
 # ============================================================
 
-SANDBOX = Sandbox(enabled=False)
+SANDBOX = Sandbox(strategy="auto")
 
 
 # ============================================================
@@ -161,24 +263,27 @@ SANDBOX_TOOL_DEFINITION = {
     "type": "function",
     "function": {
         "name": "toggle_sandbox",
-        "description": "开启或关闭工具沙箱隔离。开启后每个工具在独立子进程中执行，崩溃不影响主进程。",
+        "description": "切换工具沙箱模式: off(全部直接执行)/auto(自动按工具风险决定，推荐)/on(全部子进程隔离)",
         "parameters": {
             "type": "object",
             "properties": {
-                "enabled": {
-                    "type": "boolean",
-                    "description": "true=开启沙箱，false=关闭"
+                "strategy": {
+                    "type": "string",
+                    "enum": ["off", "auto", "on"],
+                    "description": "off=不用沙箱, auto=自动判断(默认), on=全部隔离"
                 }
             },
-            "required": ["enabled"],
+            "required": ["strategy"],
         },
     },
 }
 
 
-def tool_toggle_sandbox(enabled: bool) -> str:
-    """运行时切换沙箱状态"""
-    SANDBOX.enabled = enabled
+def tool_toggle_sandbox(strategy: str = "auto") -> str:
+    """运行时切换沙箱策略"""
+    if strategy not in VALID_STRATEGIES:
+        return f"未知策略: {strategy}，可选: {', '.join(VALID_STRATEGIES)}"
+    old = SANDBOX.strategy
+    SANDBOX.strategy = strategy
     SANDBOX.timeout = 30
-    return f"沙箱已{'开启' if enabled else '关闭'}"
-
+    return f"沙箱策略: {old} → {strategy}{'（自动判断）' if strategy == 'auto' else ''}"
