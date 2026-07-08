@@ -5,7 +5,7 @@ tools_node 调用了什么工具、花了多久？跑完后没法复盘。
 
 Harness 解决这三个问题：
   1. Recording（记录） — 每一步的 thought/action/observation/duration/tokens
-  2. Sandbox（安全）   — 工具调用在子进程执行，崩溃不拖死主图
+  2. Sandbox（安全）   — 工具调用在子进程执行，崩溃不拖死主图（off/auto/on 三策略）
   3. Replay（回放）    — 读 JSON 轨迹文件，步进或整段观看
 
 集成方式：
@@ -28,11 +28,17 @@ class Harness:
 
     同时管理轨迹记录、沙箱隔离和回放调试。
 
+    沙箱三策略：
+      - "off":  全部在当前进程执行（最快）
+      - "auto": 自动判断——safe 工具直接跑，io/cpu 工具走子进程（推荐）
+      - "on":   全部走子进程（最安全）
+
     用法：
-        harness = Harness(sandbox_enabled=False)
+        # auto 模式（默认）——get_current_time 直接跑，web_search 自动走子进程
+        harness = Harness(sandbox_strategy="auto")
+
         harness.start_trajectory(query="今天日期", model="deepseek-chat")
 
-        # 运行 Agent...
         # 在 call_model 节点后：
         harness.record_thought(step=1, thought="用户想知道日期", tokens=120)
 
@@ -52,9 +58,11 @@ class Harness:
         print(f"轨迹已保存: {path}")
     """
 
-    def __init__(self, sandbox_enabled: bool = False, sandbox_timeout: int = 30):
+    def __init__(self, sandbox_strategy: str = "auto", sandbox_timeout: int = 30):
+        if sandbox_strategy not in ("off", "auto", "on"):
+            raise ValueError(f"未知沙箱策略: {sandbox_strategy}，可选: off/auto/on")
         self.recorder: TrajectoryRecorder | None = None
-        self.sandbox = Sandbox(enabled=sandbox_enabled, timeout=sandbox_timeout)
+        self.sandbox = Sandbox(strategy=sandbox_strategy, timeout=sandbox_timeout)
         self.replayer = Replay()
 
     # ── 轨迹记录 ──
@@ -96,10 +104,7 @@ class Harness:
             return self.recorder.save()
         return ""
 
-    def add_unsafe_tool(self, tool_name: str) -> "Harness":
-        """注册不应在沙箱中运行的快速工具（如 get_current_time）"""
-        self.sandbox.add_unsafe_tool(tool_name)
-        return self
+    # ── 沙箱 ──
 
     def is_sandboxed(self, tool_name: str) -> bool:
         """判断某个工具是否应当在沙箱中执行"""
@@ -108,6 +113,14 @@ class Harness:
     def run_sandboxed(self, tool_call: dict) -> str:
         """在沙箱子进程中执行工具调用"""
         return self.sandbox.run(tool_call)
+
+    def set_sandbox_strategy(self, strategy: str) -> str:
+        """运行时切换沙箱策略"""
+        if strategy not in ("off", "auto", "on"):
+            return f"未知策略: {strategy}"
+        old = self.sandbox.strategy
+        self.sandbox.strategy = strategy
+        return f"沙箱策略: {old} → {strategy}"
 
     # ── 重放 ──
 

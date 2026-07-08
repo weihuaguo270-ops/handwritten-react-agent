@@ -2,20 +2,21 @@
 
 核心思想跟手写版一样：在 subprocess 中执行工具调用，崩溃/超时不拖死主进程。
 
+三策略模式（与手写版一致）：
+  - off:  全部在当前进程执行（最快）
+  - auto: 自动判断——safe 工具直接跑，io/cpu 工具走子进程（默认）
+  - on:   全部走子进程（最安全）
+
 与手写版 sandbox.py 的区别：
   1. 不硬编码 TOOL_REGISTRY 路径，而是通过参数传入工具的 module path
-  2. 支持白名单（某些工具太快了不值得开进程，直接跑）
-  3. _sandbox_runner.py 共享手写版的（路径相同），避免两份维护
+  2. _sandbox_runner.py 共享手写版的（路径相同），避免两份维护
+  3. 通过 Harness 统一入口 expose
 
 用法：
-    sandbox = Sandbox(timeout=30)
+    sandbox = Sandbox(strategy="auto", timeout=30)
     result = sandbox.run({
         "function": {"name": "calculator", "arguments": '{"expression": "1+1"}'}
     })
-    # → "2"
-
-快速工具（get_current_time、calculator）默认不走沙箱，因为开 subprocess 的开销
-比工具本身执行还大。web_search 等涉及网络/IO 的工具默认走沙箱。
 """
 
 import subprocess
@@ -31,47 +32,84 @@ _RUNNER_PATH = os.path.join(
     "_sandbox_runner.py",
 )
 
+# 借用手写版的工具风险分类（复用同一份分类逻辑）
+_hand_sandbox = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "harness",
+    "sandbox.py",
+)
 
-# 默认的快速工具白名单（开进程比执行工具本身还慢的）
-_DEFAULT_UNSAFE_TOOLS = {
-    "get_current_time",
-    "calculator",
-}
+
+def _import_classify():
+    """动态导入手写版的 classify_risk / should_sandbox_by_risk"""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("_hand_sandbox", _hand_sandbox)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.classify_risk, mod.should_sandbox_by_risk
+
+
+# 导入风险判断逻辑（延迟执行，避免循环导入）
+_classify_risk = None
+_should_sandbox_by_risk = None
+
+
+def _lazy_import():
+    global _classify_risk, _should_sandbox_by_risk
+    if _classify_risk is None:
+        _classify_risk, _should_sandbox_by_risk = _import_classify()
+
+
+VALID_STRATEGIES = ("off", "auto", "on")
 
 
 class Sandbox:
     """工具沙箱——在子进程中执行工具，带超时保护
 
     用法：
-        sandbox = Sandbox(enabled=True, timeout=30)
+        sandbox = Sandbox(strategy="auto", timeout=30)
         result = sandbox.run(tool_call_dict)
     """
 
-    def __init__(self, timeout: int = 30, enabled: bool = True,
-                 unsafe_tools: "set[str] | None" = None):
+    def __init__(self, timeout: int = 30, strategy: str = "auto"):
+        if strategy not in VALID_STRATEGIES:
+            raise ValueError(f"未知沙箱策略: {strategy}，可选: {VALID_STRATEGIES}")
         self.timeout = timeout
-        self.enabled = enabled
-        # 默认白名单中的工具不走沙箱
-        self._unsafe_tools = set(unsafe_tools) if unsafe_tools else _DEFAULT_UNSAFE_TOOLS.copy()
+        self.strategy = strategy
         self._runner_ready = False
+        _lazy_import()
+
+    @property
+    def enabled(self) -> bool:
+        """兼容旧接口"""
+        return self.strategy != "off"
+
+    @enabled.setter
+    def enabled(self, value: bool):
+        """兼容旧接口"""
+        self.strategy = "auto" if value else "off"
 
     def add_unsafe_tool(self, tool_name: str):
-        """添加一个不应在沙箱中运行的工具名
+        """兼容旧接口——在 auto 模式下，这个方法是空操作，因为风险判断由 classify_risk 决定
 
-        原因通常是该工具执行极快（几 ms），开 subprocess 的 20-50ms 开销反而更慢。
-        典型：get_current_time、calculator。
+        LangGraph 版的 Harness 旧代码会调用 add_unsafe_tool 注册白名单，
+        auto 模式下白名单等价于 safe 工具，由 classify_risk 自动处理。
         """
-        self._unsafe_tools.add(tool_name)
+        pass
 
     def should_sandbox(self, tool_name: str) -> bool:
         """判断某个工具是否应当在沙箱中执行
 
-        返回 True → 在子进程中执行（安全但开销大）
-        返回 False → 直接在当前进程执行（快但崩溃会拖死 Agent）
+        of → False（全部不走）
+        auto → safe 工具 False，其他 True
+        on → True（全部走）
         """
-        if not self.enabled:
+        if self.strategy == "off":
             return False
-        return tool_name not in self._unsafe_tools
+        if self.strategy == "on":
+            return True
+        # auto 模式
+        return _should_sandbox_by_risk(tool_name, "auto")
 
     def run(self, tool_call: dict) -> str:
         """在子进程中执行工具调用
@@ -81,13 +119,11 @@ class Sandbox:
                 {"function": {"name": "calculator", "arguments": '{"expression": "1+1"}'}}
 
         返回:
-            工具执行结果的字符串；失败时返回 [沙箱] 前缀的错误消息
+            工具执行结果的字符串；跳过时返回 "__SANDBOX_DISABLED__"
         """
-        if not self.enabled:
-            return "__SANDBOX_DISABLED__"
+        tool_name = tool_call.get("function", {}).get("name", "")
 
-        tool_name = tool_call.get("function", {}).get("name", "?")
-        if tool_name in self._unsafe_tools:
+        if not self.should_sandbox(tool_name):
             return "__SANDBOX_DISABLED__"
 
         self._ensure_runner()
@@ -130,7 +166,6 @@ class Sandbox:
             self._runner_ready = True
             return
 
-        # 找不到手写版的 runner，在 hand-written harness/ 目录创建
         hand_dir = os.path.dirname(_RUNNER_PATH)
         os.makedirs(hand_dir, exist_ok=True)
 
@@ -139,15 +174,12 @@ class Sandbox:
         import json
         import os
 
-        # 把项目目录加入路径
         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-        # 优先从 LangGraph 版的 tools.py 导入（如果存在）
         try:
             from graph.tools import get_tools
             TOOL_MAP = {t.name: t for t in get_tools()}
         except ImportError:
-            # fallback 到手写版的 TOOL_REGISTRY
             from react_loop import TOOL_REGISTRY
             TOOL_MAP = TOOL_REGISTRY
 

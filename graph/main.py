@@ -47,23 +47,21 @@ def _connect_mcp():
 # Harness 集成
 # ============================================================
 
-def _get_harness(enable_sandbox: bool = False) -> Harness:
+def _get_harness(sandbox_strategy: str = "auto") -> Harness:
     """创建配置好的 Harness 实例
 
-    graph/ 版本的沙箱默认关闭（开发阶段），需通过环境变量 GRAPH_ENABLE_SANDBOX=true 开启。
-    快速工具（get_current_time, calculator）注册为 unsafe，不通过子进程执行。
+    auto 模式下 get_current_time、calculator 等 safe 工具自动不走沙箱，
+    web_search、fetch_page 等 io 工具自动走沙箱，无需手动注册白名单。
+    可通过环境变量 GRAPH_SANDBOX_STRATEGY 覆盖策略（off/auto/on）。
     """
-    sandbox_env = os.environ.get("GRAPH_ENABLE_SANDBOX", "false").lower()
-    enable_sandbox = enable_sandbox or sandbox_env in ("true", "1", "yes")
+    env_strategy = os.environ.get("GRAPH_SANDBOX_STRATEGY", "").lower()
+    if env_strategy in ("off", "auto", "on"):
+        sandbox_strategy = env_strategy
 
     harness = Harness(
-        sandbox_enabled=False,  # 默认关闭——Agent 循环中的工具执行不通过子进程
+        sandbox_strategy=sandbox_strategy,
         sandbox_timeout=30,
     )
-    # 注册快速工具，不走沙箱
-    harness.add_unsafe_tool("get_current_time")
-    harness.add_unsafe_tool("calculator")
-
     return harness
 
 

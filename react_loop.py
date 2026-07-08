@@ -118,12 +118,12 @@ def execute_tool_call(tool_call):
         return '{"error": "参数解析失败"}'
     # 先查本地注册的工具
     if func_name in TOOL_REGISTRY:
-        # 沙箱启用时通过子进程执行
-        if SANDBOX.enabled:
+        # 沙箱判断（off/auto/on 三策略）
+        if SANDBOX.strategy != "off" and SANDBOX.should_sandbox(func_name):
             sandbox_result = SANDBOX.run(tool_call)
             if sandbox_result != "__SANDBOX_DISABLED__":
                 return sandbox_result
-        # 直接执行（沙箱关闭或回退）
+        # 直接执行（沙箱关闭或 safe 工具）
         try:
             return str(TOOL_REGISTRY[func_name](**arguments))
         except Exception as e:
