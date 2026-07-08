@@ -235,13 +235,13 @@
   },
   {
     "id": "harness_sandbox",
-    "question": "开启工具沙箱隔离",
+    "question": "切换沙箱为 auto 模式",
     "expected_tools": ["toggle_sandbox"],
-    "must_contain": ["开启", "已开启", "沙箱"],
+    "must_contain": ["auto", "自动"],
     "max_steps": 3,
     "timeout": 60,
     "tag": "harness",
-    "description": "沙箱隔离开关"
+    "description": "沙箱三策略切换（off/auto/on）"
   },
   {
     "id": "planner",
