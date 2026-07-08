@@ -173,15 +173,31 @@ class Sandbox:
         import sys
         import json
         import os
+        import importlib.util
 
         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-        try:
-            from graph.tools import get_tools
-            TOOL_MAP = {t.name: t for t in get_tools()}
-        except ImportError:
-            from react_loop import TOOL_REGISTRY
-            TOOL_MAP = TOOL_REGISTRY
+        # 独立加载 tools/ 目录，避免导入重型依赖
+        _TOOL_MAP = {}
+        tools_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "graph")
+        if os.path.isdir(tools_dir):
+            for fname in sorted(os.listdir(tools_dir)):
+                if not fname.endswith(".py") or fname.startswith("_"):
+                    continue
+                mod_name = fname[:-3]
+                filepath = os.path.join(tools_dir, fname)
+                try:
+                    spec = importlib.util.spec_from_file_location(mod_name, filepath)
+                    mod = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(mod)
+                    for attr_name in dir(mod):
+                        if attr_name.startswith("_"):
+                            continue
+                        attr = getattr(mod, attr_name)
+                        if callable(attr):
+                            _TOOL_MAP[attr_name] = attr
+                except Exception:
+                    pass
 
         if len(sys.argv) < 2:
             print("缺少工具调用参数")
@@ -199,12 +215,12 @@ class Sandbox:
         except (json.JSONDecodeError, KeyError):
             arguments = {}
 
-        if name not in TOOL_MAP:
+        if name not in _TOOL_MAP:
             print(f"未知工具: {name}")
             sys.exit(1)
 
         try:
-            tool_fn = TOOL_MAP[name]
+            tool_fn = _TOOL_MAP[name]
             result = tool_fn.invoke(arguments) if hasattr(tool_fn, "invoke") else tool_fn(**arguments)
             print(result)
         except Exception as e:
