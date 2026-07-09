@@ -30,7 +30,7 @@ PROFILE_HINTS = {
 
 
 def classify_tool_needs(task, call_llm):
-    task_lower = task.lower()
+    task_lower = task.lower() if isinstance(task, str) else str(task).lower()
     tags = set()
     if any(w in task_lower for w in ["时间", "时区", "当前时间", "现在几点", "纽约", "伦敦"]):
         tags.add("time")
@@ -79,15 +79,12 @@ class Orchestrator:
         print(planner.describe_schedule(self._levels))
         return tasks
 
-    def run_worker(self, task, context=""):
+    def run_worker(self, task, context="", task_obj=None):
         print(f"\n{'='*50}")
         print(f"[Worker] {task}")
-        # 如果有前置任务的结果，注入为上下文
         if context:
             print(f"  [上下文] 收到 {context.count('---')} 个前置任务的结果")
-            # 如果有前置数据，重写任务描述——让"计算"直接带上数据
             if "【前置数据】" in context:
-                # 提取 data = [...] 部分
                 data_line = ""
                 for line in context.split("\n"):
                     if line.startswith("data ="):
@@ -113,36 +110,33 @@ class Orchestrator:
             filtered = filter_tools(self.all_tools, needed)
             self.all_tools[:] = filtered
             print(f"  暴露 {len(filtered)}/{len(old_tools)} 个工具")
-
         result = self.react_loop(task_with_context)
-
-        # 捕获本 Worker 的工具输出原始数据
-        self._capture_worker_outputs(task, result)
-        if self.shared_data.get(task.id, {}).get("tool_outputs"):
-            print(f"  [共享] 已保存 Worker #{task.id} 的工具输出")
-        else:
-            print(f"  [共享] Worker #{task.id} 无工具输出")
+        if task_obj:
+            self._capture_worker_outputs(task_obj, result)
+        if old_tools:
+            self.all_tools[:] = old_tools
+        return result
 
     def _capture_worker_outputs(self, task, result):
-        """从 react_loop 保存的轨迹步骤中提取工具调用输出"""
         try:
             from handwritten_react_agent.react_loop import last_trajectory_steps
             outputs = []
             for step in last_trajectory_steps:
-                actions = step.get("actions", [])
-                if "action" in step:
-                    actions = [step["action"]] + actions
-                for act in actions:
-                    name = act.get("name", "")
-                    obs = act.get("observation", "")
-                    if name and obs and obs not in ("None", ""):
-                        outputs.append(f"[{name}] {obs[:2000]}")
+                obs = step.get("observation", "")
+                act = step.get("action", {})
+                name = act.get("name", "") if isinstance(act, dict) else ""
+                if name and obs and obs not in ("None", ""):
+                    outputs.append(f"[{name}] {obs[:2000]}")
+                for multi_act in step.get("actions", []):
+                    m_name = multi_act.get("name", "") if isinstance(multi_act, dict) else ""
+                    m_obs = multi_act.get("observation", "")
+                    if m_name and m_obs and m_obs not in ("None", ""):
+                        outputs.append(f"[{m_name}] {m_obs[:2000]}")
             self.shared_data[task.id] = {"answer": result or "", "tool_outputs": outputs}
         except Exception:
             self.shared_data[task.id] = {"answer": result or "", "tool_outputs": []}
 
     def _build_context(self, task: Task, completed_ids: set[str]) -> str:
-        """为依赖任务构建上下文：前置任务的工具输出数据 + 结果摘要"""
         if not task.depends_on:
             return ""
         parts = []
@@ -150,10 +144,8 @@ class Orchestrator:
             if t.id in task.depends_on:
                 data = self.shared_data.get(t.id, {})
                 tool_outputs = data.get("tool_outputs", [])
-                # 提取 execute_python 的输出中的数字列表
                 numbers = None
                 for out in tool_outputs:
-                    # 匹配 [数字, 数字, ...] 格式
                     import re
                     nums = re.findall(r'\[([\d.,\s]+)\]', out)
                     if nums:
@@ -165,10 +157,9 @@ class Orchestrator:
                         f"上一步生成的数据如下，请直接在代码中用这个变量：\n"
                         f"data = {numbers}\n"
                     )
-                tool_outputs = data.get("tool_outputs", [])
                 if tool_outputs:
                     parts.append(f"前置任务 #{t.id} 输出：")
-                    parts.extend(tool_outputs[:2])  # 只取前2条避免过长
+                    parts.extend(tool_outputs[:2])
         return "\n".join(parts)
 
     def synthesize(self):
@@ -194,11 +185,10 @@ class Orchestrator:
         for level_idx, level in enumerate(self._levels):
             print(f"\n{'='*50}")
             print(f"[层级 {level_idx + 1}/{len(self._levels)}] {len(level)} 个任务")
-            print(f"{'='*50}")
             if len(level) == 1:
                 t = level[0]
                 context = self._build_context(t, completed_ids)
-                result = self.run_worker(t.description, context=context)
+                result = self.run_worker(t.description, context=context, task_obj=t)
                 t.result = result
                 self.results.append(f"[#{t.id}] {t.description}\n{result}")
                 completed_ids.add(t.id)
@@ -209,7 +199,7 @@ class Orchestrator:
     def _execute_level_parallel(self, level: list, completed_ids: set[str]):
         def run_one(task: Task) -> tuple:
             context = self._build_context(task, completed_ids)
-            result = self.run_worker(task.description, context=context)
+            result = self.run_worker(task.description, context=context, task_obj=task)
             return (task.id, result)
         with ThreadPoolExecutor(max_workers=len(level)) as ex:
             futures = {ex.submit(run_one, t): t for t in level}
@@ -223,31 +213,3 @@ class Orchestrator:
                     print(f"  [完成] #{tid}: {t.description[:50]}")
                 except Exception as e:
                     print(f"  [失败] #{t.id}: {t.description[:50]}: {e}")
-
-    def _execute_parallel(self):
-        import copy
-        worker_snapshots = []
-        for task in self.tasks:
-            needed = classify_tool_needs(task, self.call_llm)
-            filtered = filter_tools(self.all_tools, needed) if needed else copy.deepcopy(self.all_tools)
-            worker_snapshots.append((task, filtered))
-            print(f"  [并行] {task} ({len(filtered)} 个工具)")
-        def run_one(task, tools_snapshot):
-            old = self.all_tools[:]
-            self.all_tools[:] = tools_snapshot
-            try:
-                result = self.react_loop(task)
-                return f"[任务] {task}\n{result}"
-            finally:
-                self.all_tools[:] = old
-        with ThreadPoolExecutor(max_workers=len(self.tasks)) as ex:
-            futures = {ex.submit(run_one, t, tl): t for t, tl in worker_snapshots}
-            for f in as_completed(futures):
-                task = futures[f]
-                try:
-                    r = f.result()
-                    self.results.append(r)
-                    print(f"  [完成] {task}")
-                except Exception as e:
-                    print(f"  [失败] {task}: {e}")
-                    self.results.append(f"[任务] {task}\n失败: {e}")
