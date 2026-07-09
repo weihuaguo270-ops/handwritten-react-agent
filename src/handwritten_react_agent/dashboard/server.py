@@ -201,7 +201,7 @@ def run_eval():
     tag = data.get('tag', None)
 
     # 异步？不，先同步执行（小规模）
-    from eval import EvalRunner
+    from handwritten_react_agent.eval import EvalRunner
     runner = EvalRunner()
     runner.load_dataset(tag=tag)
     if not runner.cases:

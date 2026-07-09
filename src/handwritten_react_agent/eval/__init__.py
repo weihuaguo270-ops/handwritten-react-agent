@@ -7,7 +7,7 @@
     python -m eval --list                 # 列出历史报告
 
 API 用法：
-    from eval import EvalRunner
+    from handwritten_react_agent.eval import EvalRunner
     runner = EvalRunner()
     runner.load_dataset("eval/dataset.json")
     runner.run_all()            # 执行所有用例

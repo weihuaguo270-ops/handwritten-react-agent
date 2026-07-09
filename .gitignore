@@ -3,8 +3,8 @@ llm_config.json
 __pycache__/
 *.pyc
 _test_*.py
-docs/
 memory.json
 rag_index.json
 trajectories/
 _sandbox_runner.py
+handwritten_react_agent.egg-info/

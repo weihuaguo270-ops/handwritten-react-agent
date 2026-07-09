@@ -16,4 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-agent = "react_loop:cli_entry"
+agent = "handwritten_react_agent.react_loop:cli_entry"
+
+[tool.setuptools.packages.find]
+where = ["src"]

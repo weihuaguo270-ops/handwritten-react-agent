@@ -265,7 +265,7 @@ def build_cot_prompt(base_system_prompt: str, query: str) -> str:
     """单步调用入口：传入原始 system prompt 和用户问题，返回带 CoT 的完整 prompt
 
     用法:
-        from cot import build_cot_prompt
+        from handwritten_react_agent.cot import build_cot_prompt
         system_prompt = build_cot_prompt(base, user_query)
     """
     return COT.inject(base_system_prompt, query=query)

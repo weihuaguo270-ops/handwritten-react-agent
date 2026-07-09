@@ -5,8 +5,7 @@ Orchestrator — 独立的多 Agent 协作模块
 """
 import json, urllib.request, sys, os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from planner import Planner, Task
+from handwritten_react_agent.planner import Planner, Task
 
 
 TOOL_PROFILES = {

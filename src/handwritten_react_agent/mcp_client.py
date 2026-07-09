@@ -6,7 +6,7 @@ MCP Client — 独立的 MCP 协议实现模块
 任何 Agent 都可以 import 使用
 
 用法:
-    from mcp_client import MCPClient
+    from handwritten_react_agent.mcp_client import MCPClient
     client = MCPClient("uvx", ["mcp-server-time"])
     client.connect()
     tools = client.discover_tools()

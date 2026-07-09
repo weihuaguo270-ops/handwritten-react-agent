@@ -4,7 +4,7 @@
 支持自动角色选择（基于关键词匹配）和运行时切换。
 
 用法:
-    from prompts import ROLE_MANAGER, Role
+    from handwritten_react_agent.prompts import ROLE_MANAGER, Role
     # 自动选择
     role = ROLE_MANAGER.select("帮我审查一下这段代码")
     # 手动指定

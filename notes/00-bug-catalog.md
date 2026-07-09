@@ -73,3 +73,21 @@
 | 输入 | `API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-xxxxxxxxxxxx")` 误提交 |
 | 错误结果 | GitHub 远程拒绝推送（secret scanning 拦截） |
 | 修复结果 | 清除 fallback key，改为空字符串。以后通过环境变量配置，不硬编码 |
+
+## Bug 9：COT 未 import
+
+| 要素 | 内容 |
+|------|------|
+| 操作 | `python react_loop.py "现在几点了"` |
+| 输入 | react_loop.py 中使用 `COT.inject()`，但 `from cot import COT` 从未添加 |
+| 错误结果 | `NameError: name 'COT' is not defined` |
+| 修复结果 | 在 import 段添加 `from handwritten_react_agent.cot import COT` |
+
+## Bug 10：MODEL 未定义
+
+| 要素 | 内容 |
+|------|------|
+| 操作 | 启动轨迹记录 `start_trajectory(query, MODEL, system_prompt)` |
+| 输入 | `MODEL` 变量在 react_loop.py 中未定义也未 import |
+| 错误结果 | `NameError: name 'MODEL' is not defined` |
+| 修复结果 | 改为 `_current_llm.model`（从 LLM 实例获取当前模型名） |
