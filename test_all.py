@@ -270,6 +270,7 @@ expected_tools = [
     "get_time", "calculator", "web_search", "fetch_page", "summarize",
     "rag_query", "switch_cot_strategy", "tot_reasoning", "switch_role",
     "switch_context_strategy", "toggle_sandbox", "start_dashboard", "clear_trajectories",
+    "execute_python",
 ]
 for name in expected_tools:
     check(f"TOOL_REGISTRY 含 {name}", name in TR)

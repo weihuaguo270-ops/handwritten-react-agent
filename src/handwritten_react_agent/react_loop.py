@@ -32,6 +32,18 @@ from handwritten_react_agent.harness import start_trajectory, current_trajectory
 from handwritten_react_agent.harness import SANDBOX
 from handwritten_react_agent.llm import LLM_DEFAULT, LLM
 from handwritten_react_agent.tools import TOOL_REGISTRY, TOOL_DEFINITIONS
+
+# 供外部读取的上一次轨迹步骤数据（Orchestrator 共享数据用）
+last_trajectory_steps = []
+
+def _finish_with_save(answer: str = ""):
+    """finish_trajectory 封装：先保存轨迹步骤供外部读取"""
+    global last_trajectory_steps
+    traj = current_trajectory()
+    if traj and hasattr(traj, 'steps'):
+        last_trajectory_steps[:] = list(traj.steps)
+    finish_trajectory(answer)
+
 MCP_CLIENTS = []
 
 DEFAULT_MCP_SERVERS = [
@@ -202,17 +214,17 @@ def react_loop(user_query, max_steps=10, tool_defs=None):
             if fa_match:
                 final = fa_match.group(1).strip()
                 print(f"\n>>> 最终答案: {final}")
-                finish_trajectory(final)
+                _finish_with_save(final)
                 return final
             # 上一步用了工具，这一步没调但给出了实质内容 → 作为答案
             if tools_were_used and len(last_content.strip()) > 10:
                 print(f"\n>>> 最终答案: {last_content.strip()}")
-                finish_trajectory(last_content.strip())
+                _finish_with_save(last_content.strip())
                 return last_content
             # 连续 4 步寒暄（没调工具也不是明确答案）→ 结束
             if not tools_were_used and len(last_content.strip()) > 5 and step >= 4:
                 print(f"\n(连续 {step} 步寒暄未调用工具，自动结束)")
-                finish_trajectory(last_content)
+                _finish_with_save(last_content)
                 return last_content
             continue
 
@@ -257,7 +269,7 @@ def react_loop(user_query, max_steps=10, tool_defs=None):
     print(f"\n(达到最大步骤 {max_steps}，停止)")
     if last_content.strip():
         print(f">>> 最终答案: {last_content.strip()}")
-    finish_trajectory(last_content.strip() if last_content.strip() else "")
+    _finish_with_save(last_content.strip() if last_content.strip() else "")
     return last_content
 
 # ============================================================

@@ -20,6 +20,8 @@ from .summarize import summarize as _tool_summarize
 from .summarize import TOOL_DEFINITION as _DEF_SUMMARIZE
 from .dashboard import start_dashboard as _tool_start_dashboard
 from .dashboard import TOOL_DEFINITION as _DEF_DASHBOARD
+from .execute_python import execute_python as _tool_execute_python
+from .execute_python import TOOL_DEFINITION as _DEF_EXECUTE_PYTHON
 
 # 来自其他模块的工具（保持原有模块独立）
 from handwritten_react_agent.rag import rag_query, RAG_TOOL_DEFINITION
@@ -45,6 +47,7 @@ TOOL_REGISTRY = {
     "toggle_sandbox": tool_toggle_sandbox,
     "start_dashboard": _tool_start_dashboard,
     "clear_trajectories": clear_trajectories,
+    "execute_python": _tool_execute_python,
 }
 
 # ===== TOOL_DEFINITIONS：发给 LLM 的工具描述 =====
@@ -61,6 +64,7 @@ TOOL_DEFINITIONS = [
     CONTEXT_TOOL_DEFINITION,
     SANDBOX_TOOL_DEFINITION,
     _DEF_DASHBOARD,
+    _DEF_EXECUTE_PYTHON,
     {
         "type": "function",
         "function": {
