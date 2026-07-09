@@ -16,7 +16,6 @@ import json
 import os
 import glob
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
 
@@ -34,8 +33,15 @@ class RAG:
         self.chunks = []     # 文本片段
         self.sources = []    # 每个片段对应的来源文件名
         self.vecs = []       # 向量
-        self.model = SentenceTransformer('BAAI/bge-small-zh-v1.5')
+        self._model = None   # 懒加载
         self._load()
+
+    def _get_model(self):
+        """首次使用时加载 BGE 模型，后续复用"""
+        if self._model is None:
+            from sentence_transformers import SentenceTransformer
+            self._model = SentenceTransformer('BAAI/bge-small-zh-v1.5')
+        return self._model
 
     # ================================================================
     # 文本分块 (Chunking)
@@ -107,7 +113,7 @@ class RAG:
             if chunk not in existing:
                 self.chunks.append(chunk)
                 self.sources.append(src)
-                vec = self.model.encode(chunk)
+                vec = self._get_model().encode(chunk)
                 self.vecs.append(vec)
                 added += 1
 
@@ -142,7 +148,7 @@ class RAG:
         if not self.chunks:
             return []
         try:
-            q_vec = self.model.encode(question)
+            q_vec = self._get_model().encode(question)
             scores = cosine_similarity([q_vec], self.vecs)[0]
 
             results = []
@@ -200,7 +206,7 @@ class RAG:
             self.chunks = data.get("chunks", [])
             self.sources = data.get("sources", [])
             self.vecs = [np.array(v) for v in data.get("vecs", [])]
-            print(f"[RAG] 已加载 {len(self.chunks)} 个文档片段")
+            print(f"[RAG] 已加载 {len(self.chunks)} 个文档片段（模型懒加载）")
         except Exception:
             self.chunks = []
             self.sources = []

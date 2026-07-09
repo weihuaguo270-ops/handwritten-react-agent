@@ -1,4 +1,3 @@
-
 """
 Memory — 独立的语义记忆模块
 ============================
@@ -7,10 +6,11 @@ Memory — 独立的语义记忆模块
 - 删: remove() / clear()
 - 查: query()
 - 自动遗忘: _prune()
+
+注意：BGE 模型采用懒加载，首次写/查记忆时才会加载。
 """
 import json
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
 
@@ -26,8 +26,16 @@ class Memory:
         self.vecs = []
         self.access_count = []
         self.last_access = []
-        self.model = SentenceTransformer('BAAI/bge-small-zh-v1.5')
+        self._model = None  # 懒加载：首次使用时才加载
         self._load()
+
+    def _get_model(self):
+        """首次访问时加载 BGE 模型，后续复用"""
+        if self._model is None:
+            from sentence_transformers import SentenceTransformer
+            print("  [记忆] 加载语义模型...")
+            self._model = SentenceTransformer('BAAI/bge-small-zh-v1.5')
+        return self._model
 
     def _load(self):
         try:
@@ -37,7 +45,8 @@ class Memory:
             self.vecs = [np.array(v) for v in data.get("vecs", [])]
             self.access_count = data.get("access_count", [0] * len(self.facts))
             self.last_access = data.get("last_access", [0] * len(self.facts))
-            print(f"[记忆] 已加载 {len(self.facts)} 条记忆")
+            if self.facts:
+                print(f"[记忆] 已加载 {len(self.facts)} 条记忆（模型懒加载）")
         except:
             self.facts = []
             self.vecs = []
@@ -56,7 +65,7 @@ class Memory:
     def add(self, fact):
         if fact not in self.facts:
             self.facts.append(fact)
-            vec = self.model.encode(fact)
+            vec = self._get_model().encode(fact)
             self.vecs.append(vec)
             self.access_count.append(0)
             self.last_access.append(0)
@@ -65,29 +74,13 @@ class Memory:
             return True
         return False
 
-    # ================================================================
-    # 新增：语义去重更新（与 graph/memory.py 的 add_or_update 一致）
-    # ================================================================
-    # 相似度阈值
     _EXACT_MATCH = 0.85
     _CONFLICT = 0.60
 
     def add_or_update(self, new_fact):
-        """
-        语义去重后写入记忆。
-
-        相似度 >= 0.85 → 同一事实，跳过
-        相似度 0.60~0.85 → 主体相同但内容不同，用新内容替换旧条目
-        相似度 < 0.60 → 不同事实，作为新条目追加
-
-        返回:
-            ("skipped", reason) / ("updated", old_fact) / ("added", None)
-        """
         if not new_fact.strip():
             return ("skipped", "空内容")
-
-        new_vec = self.model.encode(new_fact)
-
+        new_vec = self._get_model().encode(new_fact)
         if not self.facts:
             self.facts.append(new_fact)
             self.vecs.append(new_vec)
@@ -95,14 +88,11 @@ class Memory:
             self.last_access.append(0)
             self._save()
             return ("added", None)
-
         scores = cosine_similarity([new_vec], self.vecs)[0]
         best_idx = int(scores.argsort()[::-1][0])
         best_score = float(scores[best_idx])
-
         if best_score >= self._EXACT_MATCH:
             return ("skipped", f"与已有记忆重复（相似度 {best_score:.2f}）")
-
         if best_score >= self._CONFLICT:
             old_fact = self.facts[best_idx]
             self.facts[best_idx] = new_fact
@@ -111,7 +101,6 @@ class Memory:
             self.last_access[best_idx] = __import__("time").time()
             self._save()
             return ("updated", old_fact)
-
         self.facts.append(new_fact)
         self.vecs.append(new_vec)
         self.access_count.append(0)
@@ -124,7 +113,7 @@ class Memory:
         if not self.facts:
             return []
         try:
-            q_vec = self.model.encode(question)
+            q_vec = self._get_model().encode(question)
             scores = cosine_similarity([q_vec], self.vecs)[0]
             results = []
             for idx in scores.argsort()[::-1][:top_k]:
@@ -139,21 +128,18 @@ class Memory:
             return []
 
     def remove(self, fact_or_query):
-        # 1) 精确匹配
         if fact_or_query in self.facts:
             self._remove_at(self.facts.index(fact_or_query))
             self._save()
             return 1
-        # 2) 关键词包含
         for i, f in enumerate(self.facts):
             if fact_or_query in f:
                 self._remove_at(i)
                 self._save()
                 print(f"[记忆] 已删除: {f}")
                 return 1
-        # 3) 语义匹配
         try:
-            q_vec = self.model.encode(fact_or_query)
+            q_vec = self._get_model().encode(fact_or_query)
             scores = cosine_similarity([q_vec], self.vecs)[0]
             best = scores.argsort()[::-1][0]
             if scores[best] > 0.4:

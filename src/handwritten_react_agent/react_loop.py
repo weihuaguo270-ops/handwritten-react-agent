@@ -51,15 +51,23 @@ MEMORY = Memory()
 from handwritten_react_agent.rag import RAG_INDEX, rag_query, RAG_TOOL_DEFINITION
 
 # ============================================================
-# 预加载 RAG 知识库：启动时自动索引项目文档
+# 懒加载 RAG 知识库：只在首次需要时加载，避免 --help/--setup 等待
 # ============================================================
-print("[启动] 正在加载 RAG 知识库...")
-_rag_dir = os.path.dirname(os.path.abspath(__file__))
-try:
-    n = RAG_INDEX.ingest_directory(_rag_dir)
-    print(f"[启动] RAG 知识库就绪：{len(RAG_INDEX.chunks)} 个片段 (来自 {n} 个文件)")
-except Exception as e:
-    print(f"[启动] RAG 知识库加载跳过: {e}")
+_rag_loaded = False
+
+def _ensure_rag_loaded():
+    """首次调用时加载 RAG 知识库，后续不再重复"""
+    global _rag_loaded
+    if _rag_loaded:
+        return
+    _rag_loaded = True
+    print("[启动] 正在加载 RAG 知识库...")
+    _rag_dir = os.path.dirname(os.path.abspath(__file__))
+    try:
+        n = RAG_INDEX.ingest_directory(_rag_dir)
+        print(f"[启动] RAG 知识库就绪：{len(RAG_INDEX.chunks)} 个片段 (来自 {n} 个文件)")
+    except Exception as e:
+        print(f"[启动] RAG 知识库加载跳过: {e}")
 
 
 # ============================================================
@@ -142,6 +150,7 @@ def execute_tool_call(tool_call):
 # 第五步：ReAct Loop 主循环（核心！）
 # ============================================================
 def react_loop(user_query, max_steps=10, tool_defs=None):
+    _ensure_rag_loaded()
     base_prompt = """你是一个可以使用工具的 AI 助手。规则：
 1. 用 THOUGHT / ACTION / OBSERVATION / FINAL ANSWER 格式
 2. 最终答案用 FINAL ANSWER: 开头
@@ -346,6 +355,13 @@ def _setup_config():
             "model": "qwen2.5:7b",
             "temperature": 0.7, "max_tokens": 2000,
         },
+        "custom": {
+            "description": "任意 OpenAI 兼容 API（自定义地址）",
+            "base_url": "",
+            "api_key": "",
+            "model": "",
+            "temperature": 0.7, "max_tokens": 2000,
+        },
     }
 
     print(f"\n{'='*50}")
@@ -379,6 +395,18 @@ def _setup_config():
     model = input(f"模型名 (默认 {default_model}): ").strip()
     if not model:
         model = default_model
+
+    # 3b. 如果是 custom provider，额外询问 base_url
+    base_url = providers.get(selected_provider, {}).get("base_url", defaults[selected_provider]["base_url"])
+    if selected_provider == "custom":
+        default_url = base_url or "https://api.openai.com/v1"
+        base_url = input(f"API 地址 (默认 {default_url}): ").strip()
+        if not base_url:
+            base_url = default_url
+        default_model = model or "gpt-4o-mini"
+        model = input(f"模型名 (默认 {default_model}): ").strip()
+        if not model:
+            model = default_model
 
     # 4. 构建配置
     providers[selected_provider] = {
@@ -420,10 +448,12 @@ def main():
         print("  agent                         进入交互模式")
         print('  agent "你的问题"               单次提问')
         print("  agent --setup                 运行配置向导")
-        print("  agent --parallel \"多任务问题\"  并行多 Agent")
+        print("  agent --parallel \"多任务问题\"  并行多 Agent 协作")
+        print("  agent --mcp uvx mcp-server-xxx  连接额外 MCP 服务器")
         print("  agent --help                  显示帮助")
         print()
         print("首次使用建议先运行: agent --setup")
+        print("环境变量: DEEPSEEK_API_KEY / OPENAI_API_KEY / LLM_PROVIDER")
         return
 
     if not _current_llm or not _current_llm.api_key.strip():

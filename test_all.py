@@ -228,13 +228,11 @@ os.remove(path2)
 print("\n【Sandbox 沙箱隔离】")
 from handwritten_react_agent.harness import Sandbox, SANDBOX
 
-sandbox = Sandbox(enabled=False)
+sandbox = Sandbox(strategy="off")
 check("沙箱模块存在", hasattr(sandbox, "run"))
-check("沙箱默认关闭", SANDBOX.enabled == False)
-check("_sandbox_runner 存在", os.path.exists("_sandbox_runner.py"))
-check("工具定义存在", "toggle_sandbox" in str(sandbox.__class__.__module__) or True)
-
-SANDBOX_TOOL_DEFINITION = __import__("harness.sandbox", fromlist=["SANDBOX_TOOL_DEFINITION"]).SANDBOX_TOOL_DEFINITION
+check("沙箱默认关闭", SANDBOX.strategy == "off" or SANDBOX.strategy == "off")
+check("_sandbox_runner 存在", os.path.exists(os.path.join(os.path.dirname(__file__), "src/handwritten_react_agent/harness/_sandbox_runner.py")))
+SANDBOX_TOOL_DEFINITION = __import__("handwritten_react_agent.harness.sandbox", fromlist=["SANDBOX_TOOL_DEFINITION"]).SANDBOX_TOOL_DEFINITION
 check("SANDBOX_TOOL_DEFINITION 存在", "toggle_sandbox" in str(SANDBOX_TOOL_DEFINITION))
 
 
@@ -242,9 +240,9 @@ check("SANDBOX_TOOL_DEFINITION 存在", "toggle_sandbox" in str(SANDBOX_TOOL_DEF
 # 8. 工具模块（tools/）
 # ============================================================
 print("\n【工具模块 tools/】")
-from tools.calculator import calculator
-from tools.summarize import summarize
-from tools.get_time import get_time
+from handwritten_react_agent.tools.calculator import calculator
+from handwritten_react_agent.tools.summarize import summarize
+from handwritten_react_agent.tools.get_time import get_time
 
 check("calculator 1+2", calculator("1+2") == "3")
 check("calculator 小数", calculator("3.5*2") == "7.0")
@@ -256,8 +254,8 @@ check("summarize 短文本", "过短" in summarize("短"))
 check("summarize 正常", len(summarize("句子一。句子二。句子三。句子四。句子五。", 3)) > 0)
 
 # 工具定义存在
-from tools.get_time import TOOL_DEFINITION as TD_GET
-from tools.calculator import TOOL_DEFINITION as TD_CALC
+from handwritten_react_agent.tools.get_time import TOOL_DEFINITION as TD_GET
+from handwritten_react_agent.tools.calculator import TOOL_DEFINITION as TD_CALC
 check("工具定义 get_time 正确", TD_GET["function"]["name"] == "get_time")
 check("工具定义 calculator 正确", TD_CALC["function"]["name"] == "calculator")
 
@@ -290,7 +288,7 @@ for td in TDS:
 # 10. Memory（语义记忆）
 # ============================================================
 print("\n【Memory 记忆系统】")
-import memory as mem_mod
+import handwritten_react_agent.memory as mem_mod
 from handwritten_react_agent.memory import Memory
 
 m = Memory()
