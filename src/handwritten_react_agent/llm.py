@@ -2,7 +2,7 @@
 LLM 调用封装 — 多 Provider 支持、配置驱动、零代码改动切换模型
 
 用法：
-    from llm import LLM
+    from handwritten_react_agent.llm import LLM
     llm = LLM(provider="deepseek")      # 或 "openai" / "ollama" / "custom"
     reply = llm.chat(messages, tool_defs=...)
 
@@ -31,7 +31,12 @@ from typing import Optional
 from urllib import request as req
 from urllib.error import URLError
 
-CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "llm_config.json")
+# 优先找包目录下的 llm_config.json，找不到则找当前工作目录的
+_pkg_dir = os.path.dirname(os.path.abspath(__file__))
+_cwd_config = os.path.join(os.getcwd(), "llm_config.json")
+CONFIG_FILE = os.path.join(_pkg_dir, "llm_config.json")
+if not os.path.exists(CONFIG_FILE) and os.path.exists(_cwd_config):
+    CONFIG_FILE = _cwd_config
 
 # 全局缓存，避免多次解析
 _CONFIG: Optional[dict] = None

@@ -8,27 +8,27 @@ tools/ — 工具模块统一入口
 新增工具只需在 tools/ 下加文件，__init__.py 会自动发现。
 """
 
-from tools.get_time import get_time as _tool_get_time
-from tools.get_time import TOOL_DEFINITION as _DEF_GET_TIME
-from tools.calculator import calculator as _tool_calculator
-from tools.calculator import TOOL_DEFINITION as _DEF_CALCULATOR
-from tools.web_search import web_search as _tool_web_search
-from tools.web_search import TOOL_DEFINITION as _DEF_WEB_SEARCH
-from tools.fetch_page import fetch_page as _tool_fetch_page
-from tools.fetch_page import TOOL_DEFINITION as _DEF_FETCH_PAGE
-from tools.summarize import summarize as _tool_summarize
-from tools.summarize import TOOL_DEFINITION as _DEF_SUMMARIZE
-from tools.dashboard import start_dashboard as _tool_start_dashboard
-from tools.dashboard import TOOL_DEFINITION as _DEF_DASHBOARD
+from .get_time import get_time as _tool_get_time
+from .get_time import TOOL_DEFINITION as _DEF_GET_TIME
+from .calculator import calculator as _tool_calculator
+from .calculator import TOOL_DEFINITION as _DEF_CALCULATOR
+from .web_search import web_search as _tool_web_search
+from .web_search import TOOL_DEFINITION as _DEF_WEB_SEARCH
+from .fetch_page import fetch_page as _tool_fetch_page
+from .fetch_page import TOOL_DEFINITION as _DEF_FETCH_PAGE
+from .summarize import summarize as _tool_summarize
+from .summarize import TOOL_DEFINITION as _DEF_SUMMARIZE
+from .dashboard import start_dashboard as _tool_start_dashboard
+from .dashboard import TOOL_DEFINITION as _DEF_DASHBOARD
 
 # 来自其他模块的工具（保持原有模块独立）
-from rag import rag_query, RAG_TOOL_DEFINITION
-from cot import tool_switch_cot_strategy, COT_TOOL_DEFINITION
-from tot import tool_tot_reasoning, TOT_TOOL_DEFINITION
-from prompts import tool_switch_role, ROLE_TOOL_DEFINITION
-from context import tool_switch_context_strategy, CONTEXT_TOOL_DEFINITION
-from harness import tool_toggle_sandbox, SANDBOX_TOOL_DEFINITION
-from harness.recorder import clear_trajectories
+from handwritten_react_agent.rag import rag_query, RAG_TOOL_DEFINITION
+from handwritten_react_agent.cot import tool_switch_cot_strategy, COT_TOOL_DEFINITION
+from handwritten_react_agent.tot import tool_tot_reasoning, TOT_TOOL_DEFINITION
+from handwritten_react_agent.prompts import tool_switch_role, ROLE_TOOL_DEFINITION
+from handwritten_react_agent.context import tool_switch_context_strategy, CONTEXT_TOOL_DEFINITION
+from handwritten_react_agent.harness import tool_toggle_sandbox, SANDBOX_TOOL_DEFINITION
+from handwritten_react_agent.harness.recorder import clear_trajectories
 
 # ===== TOOL_REGISTRY：name → 函数 =====
 TOOL_REGISTRY = {

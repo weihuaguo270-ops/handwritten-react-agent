@@ -15,7 +15,6 @@ LLM 配置：通过 llm_config.json + LLM_PROVIDER 环境变量控制。
 import sys
 import os
 # ensure mcp_client.py can be found
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import json
 import re
@@ -23,15 +22,16 @@ import time
 from urllib import request as req
 from urllib.error import URLError
 from urllib.parse import urlparse, quote
-from mcp_client import MCPClient
-from orchestrator import Orchestrator
-from tot import TOT, set_tot_llm_call
-from prompts import ROLE_MANAGER
-from context import CONTEXT
-from harness import start_trajectory, current_trajectory, finish_trajectory
-from harness import SANDBOX
-from llm import LLM_DEFAULT, LLM
-from tools import TOOL_REGISTRY, TOOL_DEFINITIONS
+from handwritten_react_agent.mcp_client import MCPClient
+from handwritten_react_agent.orchestrator import Orchestrator
+from handwritten_react_agent.tot import TOT, set_tot_llm_call
+from handwritten_react_agent.cot import COT
+from handwritten_react_agent.prompts import ROLE_MANAGER
+from handwritten_react_agent.context import CONTEXT
+from handwritten_react_agent.harness import start_trajectory, current_trajectory, finish_trajectory
+from handwritten_react_agent.harness import SANDBOX
+from handwritten_react_agent.llm import LLM_DEFAULT, LLM
+from handwritten_react_agent.tools import TOOL_REGISTRY, TOOL_DEFINITIONS
 MCP_CLIENTS = []
 
 DEFAULT_MCP_SERVERS = [
@@ -45,10 +45,10 @@ os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
 # ============================================================
 # 记忆系统（独立模块见 memory.py）
 # ============================================================
-from memory import Memory
+from handwritten_react_agent.memory import Memory
 
 MEMORY = Memory()
-from rag import RAG_INDEX, rag_query, RAG_TOOL_DEFINITION
+from handwritten_react_agent.rag import RAG_INDEX, rag_query, RAG_TOOL_DEFINITION
 
 # ============================================================
 # 预加载 RAG 知识库：启动时自动索引项目文档
@@ -153,7 +153,7 @@ def react_loop(user_query, max_steps=10, tool_defs=None):
     print(f"[角色] {ROLE_MANAGER.current_role_name()}")
 
     # 开始轨迹记录
-    start_trajectory(user_query, MODEL, system_prompt)
+    start_trajectory(user_query, _current_llm.model, system_prompt)
 
     messages = [
         {"role": "system", "content": system_prompt},

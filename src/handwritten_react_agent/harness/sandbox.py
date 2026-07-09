@@ -98,9 +98,8 @@ def _ensure_runner():
         import os
 
         # 把项目目录加入路径
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-        from react_loop import TOOL_REGISTRY
+        from handwritten_react_agent.react_loop import TOOL_REGISTRY
 
         if len(sys.argv) < 2:
             print("缺少工具调用参数")

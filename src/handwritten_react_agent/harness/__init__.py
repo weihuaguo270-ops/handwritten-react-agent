@@ -4,7 +4,7 @@
 合并为统一入口，概念上对应 Agent = LLM + Harness 中的 Harness。
 
 使用方式:
-    from harness import Harness
+    from handwritten_react_agent.harness import Harness
     h = Harness()
     h.start_session(query, model, system_prompt)
     # Agent 运行...

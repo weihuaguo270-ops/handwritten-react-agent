@@ -10,7 +10,7 @@
   - summarize: 将最早的多轮对话压缩成一段摘要（需 1 次 LLM 调用）
 
 用法:
-    from context import CONTEXT
+    from handwritten_react_agent.context import CONTEXT
     # 在每步之后
     messages = CONTEXT.manage(messages, llm_call=my_llm)
 """

@@ -5,7 +5,7 @@
 通过拓扑排序确定执行顺序：无依赖的先执行（可并行），有依赖的等前置完成。
 
 用法:
-    from planner import PLANNER
+    from handwritten_react_agent.planner import PLANNER
     tasks = PLANNER.plan("查今天和明天的天气，对比温差")
     # → [Task(id='1', desc='搜索今天天气', depends_on=[]),
     #     Task(id='2', desc='搜索明天天气', depends_on=[]),
