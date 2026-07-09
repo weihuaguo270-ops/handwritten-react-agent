@@ -675,6 +675,19 @@ LangGraph 在架构中的角色：
 - [x] Eval + Dashboard 打通（从评测失败案例直接跳转到轨迹回放）
 - [x] 沙箱三策略（off/auto/on）— Agent 自动按工具风险决定隔离
 - [x] MCP/HTTP 未知工具默认 safe，不走沙箱
+- [x] agent --setup 配置向导（交互式 API Key 配置）
+- [x] RAG + Memory 模型懒加载（--help 从 ~15s 缩短到 ~1.6s）
+- [x] LangGraph 版同步优化（懒加载 + 路径修复）
+- [x] .env.example 环境变量模板
+- [x] monorepo 结构重构（src/ + experiments/）
+
+## 快速体验
+
+```bash
+pip install -e .
+agent --setup        # 30 秒配好 API Key
+agent "现在几点？"    # 直接使用
+```
 
 ## License
 
