@@ -82,10 +82,14 @@ class Orchestrator:
     def run_worker(self, task, context=""):
         print(f"\n{'='*50}")
         print(f"[Worker] {task}")
-        print(f"{'='*50}")
+        # 如果有前置任务的结果，注入为上下文
         if context:
             print(f"  [上下文] 收到 {context.count('---')} 个前置任务的结果")
-            task_with_context = f"{task}\n\n参考信息：\n{context}"
+            # 把前置数据嵌入任务描述，让 LLM 直接看到数字
+            task_with_context = (
+                f"{task}\n\n"
+                f"{context}\n\n"
+            )
         else:
             task_with_context = task
         needed = classify_tool_needs(task_with_context if context else task, self.call_llm)
@@ -101,6 +105,10 @@ class Orchestrator:
 
         # 捕获本 Worker 的工具输出原始数据
         self._capture_worker_outputs(task, result)
+        if self.shared_data.get(task.id, {}).get("tool_outputs"):
+            print(f"  [共享] 已保存 Worker #{task.id} 的工具输出")
+        else:
+            print(f"  [共享] Worker #{task.id} 无工具输出")
 
     def _capture_worker_outputs(self, task, result):
         """从 react_loop 保存的轨迹步骤中提取工具调用输出"""
@@ -124,19 +132,30 @@ class Orchestrator:
         """为依赖任务构建上下文：前置任务的工具输出数据 + 结果摘要"""
         if not task.depends_on:
             return ""
-        parts = ["以下是已完成任务的结果，供你参考："]
+        parts = []
         for t in self.tasks:
             if t.id in task.depends_on:
                 data = self.shared_data.get(t.id, {})
-                parts.append(f"\n--- #{t.id}: {t.description} ---")
-                # 优先传工具输出的原始数据（结构化数据）
+                tool_outputs = data.get("tool_outputs", [])
+                # 提取 execute_python 的输出中的数字列表
+                numbers = None
+                for out in tool_outputs:
+                    # 匹配 [数字, 数字, ...] 格式
+                    import re
+                    nums = re.findall(r'\[([\d.,\s]+)\]', out)
+                    if nums:
+                        numbers = nums[0]
+                        break
+                if numbers:
+                    parts.append(
+                        f"【前置数据】\n"
+                        f"上一步生成的数据如下，请直接在代码中用这个变量：\n"
+                        f"data = {numbers}\n"
+                    )
                 tool_outputs = data.get("tool_outputs", [])
                 if tool_outputs:
-                    parts.append("【实际输出数据】")
-                    parts.extend(tool_outputs)
-                # 再传 LLM 的总结
-                if data.get("answer"):
-                    parts.append(f"【任务总结】{data['answer']}")
+                    parts.append(f"前置任务 #{t.id} 输出：")
+                    parts.extend(tool_outputs[:2])  # 只取前2条避免过长
         return "\n".join(parts)
 
     def synthesize(self):
