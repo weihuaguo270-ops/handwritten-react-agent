@@ -141,6 +141,7 @@ class Orchestrator:
                 t = level[0]
                 context = self._build_context(t, completed_ids)
                 result = self.run_worker(t.description, context=context)
+                t.result = result  # ← 保存结果供后续任务引用
                 self.results.append(f"[#{t.id}] {t.description}\n{result}")
                 completed_ids.add(t.id)
             else:
@@ -173,6 +174,7 @@ class Orchestrator:
                 t = futures[f]
                 try:
                     tid, result = f.result()
+                    t.result = result  # ← 保存结果供后续任务引用
                     self.results.append(f"[#{tid}] {t.description}\n{result}")
                     completed_ids.add(tid)
                     print(f"  [完成] #{tid}: {t.description[:50]}")
