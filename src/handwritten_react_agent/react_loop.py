@@ -307,21 +307,136 @@ def multi_agent_chain(user_query, parallel=False):
     """多 Agent 协作（内部使用 Orchestrator 类）"""
     return Orchestrator(call_llm, react_loop, tool_definitions=TOOL_DEFINITIONS).execute(user_query, parallel=parallel)
 
+def _setup_config():
+    """交互式配置向导：创建/更新 llm_config.json"""
+    import json
+    # 找配置文件的写入路径（当前工作目录）
+    config_path = os.path.join(os.getcwd(), "llm_config.json")
+
+    # 如果已有配置，先加载
+    config = {}
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, encoding="utf-8") as f:
+                config = json.load(f)
+        except Exception:
+            pass
+
+    # 提供者模板
+    providers = config.get("providers", {})
+    defaults = {
+        "deepseek": {
+            "description": "DeepSeek 官方 API",
+            "base_url": "https://api.deepseek.com",
+            "api_key": "",
+            "model": "deepseek-v4-flash",
+            "temperature": 0.7, "max_tokens": 2000,
+        },
+        "openai": {
+            "description": "OpenAI API（兼容 GPT-4o 等）",
+            "base_url": "https://api.openai.com/v1",
+            "api_key": "",
+            "model": "gpt-4o-mini",
+            "temperature": 0.7, "max_tokens": 2000,
+        },
+        "ollama": {
+            "description": "本地 Ollama（需先启动 ollama serve）",
+            "base_url": "http://localhost:11434/v1",
+            "api_key": "",
+            "model": "qwen2.5:7b",
+            "temperature": 0.7, "max_tokens": 2000,
+        },
+    }
+
+    print(f"\n{'='*50}")
+    print("  Agent 配置向导")
+    print(f"{'='*50}")
+    print(f"  配置文件将保存到: {config_path}\n")
+
+    # 1. 选择默认 provider
+    provider_names = list(defaults.keys())
+    print("可用的 LLM 提供商：")
+    for i, name in enumerate(provider_names, 1):
+        desc = defaults[name]["description"]
+        print(f"  {i}. {name} - {desc}")
+    print()
+
+    default_provider = config.get("default", "deepseek")
+    default_idx = provider_names.index(default_provider) + 1 if default_provider in provider_names else 1
+    choice = input(f"选择提供商 (1-{len(provider_names)}, 默认 {default_idx}): ").strip()
+    selected_idx = int(choice) - 1 if choice.isdigit() and 1 <= int(choice) <= len(provider_names) else default_idx - 1
+    selected_provider = provider_names[selected_idx]
+
+    # 2. 输入 API Key
+    existing_key = providers.get(selected_provider, {}).get("api_key", "")
+    key_hint = f" (已有: {existing_key[:8]}...)" if existing_key and len(existing_key) > 8 else ""
+    api_key = input(f"输入 {selected_provider} 的 API Key{key_hint}: ").strip()
+    if not api_key and existing_key:
+        api_key = existing_key
+
+    # 3. 输入模型名（可选）
+    default_model = providers.get(selected_provider, {}).get("model", defaults[selected_provider]["model"])
+    model = input(f"模型名 (默认 {default_model}): ").strip()
+    if not model:
+        model = default_model
+
+    # 4. 构建配置
+    providers[selected_provider] = {
+        "description": defaults[selected_provider]["description"],
+        "base_url": providers.get(selected_provider, {}).get("base_url", defaults[selected_provider]["base_url"]),
+        "api_key": api_key,
+        "model": model,
+        "temperature": providers.get(selected_provider, {}).get("temperature", 0.7),
+        "max_tokens": providers.get(selected_provider, {}).get("max_tokens", 2000),
+    }
+    config["default"] = selected_provider
+    config["providers"] = providers
+
+    # 5. 保存
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+    print(f"\n✅ 配置已保存到: {config_path}")
+    print(f"   默认提供商: {selected_provider}")
+    print(f"   模型: {model}")
+    print(f"\n现在可以运行: agent \"你的问题\"")
+
+
 def cli_entry():
     """CLI 入口点：供 pip 安装后的 'agent' 命令使用"""
     main()
+
 
 def main():
     """命令行入口：支持交互模式和单次问题模式。"""
     global TOOL_DEFINITIONS
 
+    # 处理配置相关命令（不依赖 LLM）
+    _sys_argv = sys.argv[1:] if len(sys.argv) > 1 else []
+    if "--setup" in _sys_argv or "setup" in _sys_argv:
+        _setup_config()
+        return
+    if "--help" in _sys_argv or "-h" in _sys_argv:
+        print("用法:")
+        print("  agent                         进入交互模式")
+        print('  agent "你的问题"               单次提问')
+        print("  agent --setup                 运行配置向导")
+        print("  agent --parallel \"多任务问题\"  并行多 Agent")
+        print("  agent --help                  显示帮助")
+        print()
+        print("首次使用建议先运行: agent --setup")
+        return
+
     if not _current_llm or not _current_llm.api_key.strip():
         _provider = os.environ.get("LLM_PROVIDER",
                                     _current_llm.provider_name if _current_llm else "?")
         print(f"错误：未配置 {_provider} 的 API Key。")
-        print(f"请设置环境变量或在 llm_config.json 中配置。")
-        print(f"  Windows: set {_provider.upper()}_API_KEY=sk-xxx")
-        print(f"  Linux:   export {_provider.upper()}_API_KEY=sk-xxx")
+        print()
+        print("请选择以下方式之一配置：")
+        print(f"  1. 运行配置向导:   agent --setup")
+        print(f"  2. 设置环境变量:    set {_provider.upper()}_API_KEY=sk-xxx  (Windows)")
+        print(f"                        export {_provider.upper()}_API_KEY=sk-xxx  (Linux)")
+        print(f"  3. 编辑配置文件:    llm_config.json（与 agent 命令同目录）")
+        print()
         sys.exit(1)
 
     _sys_argv = sys.argv[1:]
