@@ -7,6 +7,10 @@ import os, sys, importlib, json, glob
 
 _base = os.path.dirname(os.path.abspath(__file__))
 os.chdir(_base)  # 确保 CWD 是项目根目录
+
+# 清除环境变量，让模块直接从 llm_config.json 读取 key
+# （Windows 系统环境变量可能覆盖配置文件中的 key）
+os.environ.pop("DEEPSEEK_API_KEY", None)
 for p in [_base, os.path.join(_base, "src"),
           os.path.join(_base, "experiments", "eval-engine")]:
     sys.path.insert(0, p)
