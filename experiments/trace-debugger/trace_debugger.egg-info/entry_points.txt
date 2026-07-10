@@ -1,0 +1,3 @@
+[console_scripts]
+tdebug = trace_debugger.cli:main
+trace-debug = trace_debugger.cli:main

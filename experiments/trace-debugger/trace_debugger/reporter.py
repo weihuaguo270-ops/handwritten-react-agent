@@ -46,11 +46,19 @@ def format_report(analysis: TrajectoryAnalysis) -> str:
         for sa in pa.step_analyses:
             step_icon = "✅" if sa.success else "❌"
             action_info = f" [{sa.action}]" if sa.action else ""
-            lines.append(f"    {step_icon} Step {sa.step_index}{action_info}  {sa.duration:.1f}s")
+            dur = f"  {sa.duration:.1f}s" if sa.duration else ""
+            lines.append(f"    {step_icon} Step {sa.step_index}{action_info}{dur}")
             if sa.failure_detail:
                 lines.append(f"      原因: {sa.failure_detail}")
             if sa.suggestion:
                 lines.append(f"      建议: {sa.suggestion}")
+        lines.append("")
+
+    # 轨迹级问题
+    if analysis.traj_issues:
+        lines.append("  ── 轨迹级问题 ──")
+        for issue in analysis.traj_issues:
+            lines.append(f"  ⚠ {issue}")
         lines.append("")
 
     # 失败路径汇总

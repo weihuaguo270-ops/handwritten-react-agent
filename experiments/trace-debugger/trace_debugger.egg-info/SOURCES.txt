@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+trace_debugger/__init__.py
+trace_debugger/analyzer.py
+trace_debugger/cli.py
+trace_debugger/reader.py
+trace_debugger/reporter.py
+trace_debugger.egg-info/PKG-INFO
+trace_debugger.egg-info/SOURCES.txt
+trace_debugger.egg-info/dependency_links.txt
+trace_debugger.egg-info/entry_points.txt
+trace_debugger.egg-info/top_level.txt

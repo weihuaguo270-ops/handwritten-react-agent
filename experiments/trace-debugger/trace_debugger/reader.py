@@ -137,21 +137,39 @@ def parse(data: dict) -> Trajectory:
         action_name = action.get("name", "") if isinstance(action, dict) else ""
         action_args = action.get("arguments", action.get("args", "")) if isinstance(action, dict) else ""
 
+        # 参数截断：Python 代码只保留关键行，其他参数截断前 80 字符
+        action_args_display = str(action_args)
+        if len(action_args_display) > 100:
+            if action_name in ("execute_python", "execute_command", "run_code"):
+                # 代码类参数：只显示前 2 行 + 行数
+                lines = action_args_display.split("\\n")
+                short = "\\n".join(lines[:2])
+                action_args_display = f"{short}\\n... ({len(lines)} lines total)"
+            else:
+                action_args_display = action_args_display[:80] + "..."
+
         # 检测错误
         has_error = False
         error_msg = ""
         if observation:
-            if "error" in observation.lower() or "异常" in observation:
+            obs_lower = observation.lower()
+            if any(kw in obs_lower for kw in ["error", "异常", "traceback", "stderr"]):
                 has_error = True
-                error_msg = observation[:200]
+                # 错误消息精简
+                lines = observation.strip().split("\n")
+                meaningful = [l for l in lines if l.strip()]
+                if meaningful:
+                    error_msg = meaningful[0][:150]
+                else:
+                    error_msg = observation[:150]
 
         steps.append(Step(
             index=step_num,
             thought=thought,
             action_name=action_name,
-            action_args=str(action_args)[:200],
+            action_args=action_args_display,
             observation=observation[:300],
-            duration=duration,
+            duration=duration or 0.0,
             tokens=tokens,
             has_error=has_error,
             error_message=error_msg,
