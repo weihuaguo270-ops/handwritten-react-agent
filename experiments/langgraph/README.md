@@ -110,13 +110,7 @@ LLM_PROVIDER=deepseek python main.py "写一段 Python 代码"
 | 批量执行 | 无 | `ThreadPoolExecutor` 并行 Worker |
 | 可检查点 | 无（全局变量） | `MemorySaver` 检查点 |
 
-## 面试话术要点
-
-> "我在手写 Agent 理解透底层原理后，又用 LangChain/LangGraph 完整重写了一遍。这不是迁移——而是对照实验：同一个 Agent 能力，从零实现 vs 框架实现，让我深入理解了两者的设计取舍。比如 LangGraph 的 StateGraph 自动处理状态合并和条件路由，比手写的 `for` 循环 + `if` 分支更简洁，但手写的方式在调试时每一步都可见可控，各有优劣。"
-
-> "多 Agent 编排部分，我用 LangGraph 的 supervisor → worker → join 模式实现了 DAG 调度。和手写版不同的是，LangGraph 的 `StateFlow` 天然支持并行执行，而手写版需要自己管理 ThreadPoolExecutor。但手写版的工具隔离（每个 Worker 只暴露相关工具）是我独立思考的设计，LangGraph 版反而需要额外做 `filter_tools()` 兼容。"
-
-## 测试
+## 快速验证
 
 ```bash
 # 快速验证
