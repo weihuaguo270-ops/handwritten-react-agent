@@ -99,28 +99,16 @@ def _execute(query: str):
     import src.handwritten_react_agent.react_loop as rl_mod
     rl_mod.execute_tool_call = perm.wrap(orig)
 
-    # ── 执行（实时显示 Agent 输出）───
-    _console.print(f"[dim]● {task_type}[/dim]" if task_type else "")
-
-    # 重定向 print 到 rich，让 Agent 的中间输出也显示在对话中
-    class _PrintRedirect:
-        def write(self, s):
-            if s.strip():
-                _console.print(s.rstrip())
-        def flush(self):
-            pass
-
-    old_stdout = sys.stdout
-    sys.stdout = _PrintRedirect()
+    # ── 执行（Agent 原生输出直接显示）───
+    _console.print(f"[dim]{task_type}[/]" if task_type else "")
 
     try:
         result = rl_mod.react_loop(query, max_steps=10)
     except Exception as e:
-        sys.stdout = old_stdout
         _console.print(f"[red]✗ {e}[/]")
+        import traceback
+        traceback.print_exc()
         return
-
-    sys.stdout = old_stdout
 
     # ── 复盘 ──
     report = perm.watch.summary()
