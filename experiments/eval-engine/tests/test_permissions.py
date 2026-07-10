@@ -84,9 +84,35 @@ def test_deny_default():
     print("  ✅ DENY 默认拒绝")
 
 def test_deny_override():
-    h = HumanInTheLoop(ask_fn=_make_ask_fn("⚠ 仅此一次允许")[0])
+    h = HumanInTheLoop(ask_fn=_make_ask_fn("⏱ 仅此一次（5分钟有效）")[0])
     assert h.check_tool_call("delete_directory", {}) is True
-    print("  ✅ DENY 用户覆盖")
+    print("  ✅ DENY 临时授权（5分钟有效）")
+
+def test_deny_permanent():
+    h = HumanInTheLoop(ask_fn=_make_ask_fn("🔓 永久允许此类操作")[0])
+    assert h.check_tool_call("delete_directory", {}) is True
+    # 第二次同类型操作不再询问
+    assert h.check_tool_call("delete_directory", {"path": "/tmp"}) is True
+    print("  ✅ DENY 永久授权生效")
+
+def test_temp_auth_expiry():
+    """临时授权过期后不再有效"""
+    call_n = {"count": 0}
+
+    def _ask_once_then_reject(msg, choices):
+        call_n["count"] += 1
+        if call_n["count"] == 1:
+            return "⏱ 仅此一次（5分钟有效）"
+        return "🚫 保持拒绝"
+
+    h = HumanInTheLoop(ask_fn=_ask_once_then_reject, temp_auth_minutes=0.01)
+    # 第一次：获得临时授权
+    assert h.check_tool_call("delete_directory", {}) is True
+    # 0.01 分钟 = 0.6 秒，等 0.7 秒后过期
+    import time; time.sleep(0.7)
+    # 第二次：临时授权已过期，用户拒绝
+    assert h.check_tool_call("delete_directory", {}) is False
+    print("  ✅ 临时授权过期正确")
 
 def test_direction_approved():
     h = HumanInTheLoop(ask_fn=_make_ask_fn("✅ 允许")[0])
@@ -144,7 +170,7 @@ if __name__ == "__main__":
         test_safe_tools, test_confirm_tools, test_deny_tools,
         test_unknown_safe, test_high_risk, test_describe, test_describe_masked,
         test_auto_approve_safe, test_confirm_approved, test_confirm_denied,
-        test_deny_default, test_deny_override,
+        test_deny_default, test_deny_override, test_deny_permanent, test_temp_auth_expiry,
         test_direction_approved, test_direction_denied,
         test_no_ask_fn, test_audit_log, test_tool_blocker, test_notify,
     ]
