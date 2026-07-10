@@ -16,7 +16,9 @@ from rich.prompt import Prompt
 import typer
 
 _console = Console()
-_last_traj_file = [""]  # 用于 /replay 记录最近一次轨迹文件路径
+_last_traj_file = [""]
+_session_history: list[dict] = []  # 多轮对话历史 [{role, content}, ...]
+_MAX_HISTORY = 10
 
 
 def _import(mod: str, name: str):
@@ -64,9 +66,11 @@ def _handle_cmd(cmd: str):
         _console.print("  /exit        退出")
         _console.print("  /clear       清屏")
         _console.print("  /config      查看配置")
+        _console.print("  /memory      查看对话历史")
         _console.print("  /provider    切换 Provider（例：/provider openai）")
         _console.print("  /replay      查看上一条轨迹")
         _console.print("  /eval        评测上一条回答")
+        _console.print("  /orch        多 Agent 编排（例：/orch 查时间和算50*30）")
     elif c == "/clear":
         os.system("cls" if os.name == "nt" else "clear")
     elif c == "/config":
@@ -78,6 +82,16 @@ def _handle_cmd(cmd: str):
         _cmd_replay()
     elif c == "/eval":
         _cmd_eval_last()
+    elif c == "/memory":
+        if _session_history:
+            _console.print(f"[dim]对话历史 ({len(_session_history)} 条):[/]")
+            for m in _session_history[-5:]:
+                role = "你" if m["role"] == "user" else "Agent"
+                _console.print(f"  {role}: {m['content'][:100]}")
+        else:
+            _console.print("[dim]当前会话无历史[/]")
+    elif c in ("/orch", "/orchestrator") and len(args) > 1:
+        _execute_orchestrator(args[1])
     else:
         _console.print(f"[red]? {cmd}[/]")
 
@@ -101,9 +115,22 @@ def _execute(query: str):
 
     _console.print(f"[dim]{task_type}[/]" if task_type else "")
 
+    # ── 多轮对话：注入历史上下文 ──
+    if _session_history:
+        context_summary = "\n".join(
+            f"{'你' if m['role']=='user' else '我'}: {m['content'][:200]}"
+            for m in _session_history[-3:]  # 最近 3 轮
+        )
+        query_with_context = (
+            f"【对话历史】\n{context_summary}\n\n"
+            f"【当前问题】\n{query}"
+        )
+    else:
+        query_with_context = query
+
     # ── 执行 ──
     try:
-        result = rl_mod.react_loop(query, max_steps=10)
+        result = rl_mod.react_loop(query_with_context, max_steps=10)
     except Exception as e:
         _console.print(f"[red]✗ {e}[/]")
         return
@@ -122,6 +149,13 @@ def _execute(query: str):
         if hitl.check_direction("重试失败路径", details=report.one_liner):
             _console.print("↻ 重试...")
             _execute(query)
+
+    # ── 保存对话历史 ──
+    _session_history.append({"role": "user", "content": query})
+    if result:
+        _session_history.append({"role": "assistant", "content": result[:500]})
+    if len(_session_history) > _MAX_HISTORY * 2:
+        _session_history[:-(_MAX_HISTORY * 2)] = []
 
     # ── 快速 Eval 评分 ──
     if task_type != "functional_test" and result:
@@ -204,6 +238,44 @@ def _cmd_replay():
                 _console.print(f"  [dim]Step {s['step']}: → {obs}[/]")
     except Exception as e:
         _console.print(f"[red]✗ {e}[/]")
+
+
+# ══════════════════════════════════════════════
+#  HITL
+# ══════════════════════════════════════════════
+
+# ══════════════════════════════════════════════
+#  Orchestrator
+# ══════════════════════════════════════════════
+
+def _execute_orchestrator(query: str):
+    """多 Agent 编排执行"""
+    _console.print("[dim]orchestrator[/]")
+    try:
+        from src.handwritten_react_agent.orchestrator import Orchestrator
+        from src.handwritten_react_agent.react_loop import react_loop, call_llm
+        from src.handwritten_react_agent.tools import TOOL_DEFINITIONS
+
+        orch = Orchestrator(
+            call_llm_func=call_llm,
+            react_loop_func=react_loop,
+            tool_definitions=TOOL_DEFINITIONS,
+        )
+        tasks = orch.plan(query)
+        if not tasks:
+            _console.print("[red]Orchestrator 无法分解任务[/]")
+            return
+
+        result = orch.execute(query)
+        _console.print(f"\n[green]{result[:500]}[/]" if result else "[red]无结果[/]")
+
+        _session_history.append({"role": "user", "content": f"[Orchestrator] {query}"})
+        if result:
+            _session_history.append({"role": "assistant", "content": result[:500]})
+    except Exception as e:
+        _console.print(f"[red]✗ {e}[/]")
+        import traceback
+        traceback.print_exc()
 
 
 # ══════════════════════════════════════════════
