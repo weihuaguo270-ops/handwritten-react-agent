@@ -37,7 +37,7 @@ app = typer.Typer(name="hagent", no_args_is_help=True)
 
 @app.command()
 def shell(
-    provider: str = typer.Option("", "--provider", "-p"),
+    provider: str = "",
 ):
     """启动交互模式（类似 Claude Code）"""
     if provider:
@@ -186,7 +186,7 @@ def _show_config():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 1:
+    if len(sys.argv) <= 1:
         shell()
     else:
         app()
