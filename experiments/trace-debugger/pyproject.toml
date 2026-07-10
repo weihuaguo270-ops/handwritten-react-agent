@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trace-debugger"
+version = "0.1.0"
+description = "Agent 执行轨迹复盘分析工具 — 读取 Harness 轨迹，分析每条路径成败原因，生成可交互的复盘报告"
+readme = "README.md"
+requires-python = ">=3.10"
+
+[project.scripts]
+trace-debug = "trace_debugger.cli:main"
+tdebug = "trace_debugger.cli:main"
