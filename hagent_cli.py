@@ -1,191 +1,50 @@
 """hagent — handwritten-react-agent CLI
 
-极简交互风格（类似 Claude Code / Codex）。
+设计原则：
+  1. 无 banner、无 loading、无中间过程
+  2. 输入问题 → 得到答案
+  3. 想看过程有 /replay
+  4. 命令与提示符风格统一
 """
 from __future__ import annotations
-import os, sys, importlib, json, glob
+import os
+import sys
+import json
+import glob
+from contextlib import redirect_stdout
+from io import StringIO
 
 _base = os.path.dirname(os.path.abspath(__file__))
-os.chdir(_base)  # 确保 CWD 是项目根目录
-
-# 清除环境变量，让模块直接从 llm_config.json 读取 key
-# （Windows 系统环境变量可能覆盖配置文件中的 key）
+os.chdir(_base)
 os.environ.pop("DEEPSEEK_API_KEY", None)
 for p in [_base, os.path.join(_base, "src"),
           os.path.join(_base, "experiments", "eval-engine")]:
     sys.path.insert(0, p)
 
 from rich.console import Console
-from rich.table import Table
 from rich.prompt import Prompt
 import typer
 
 _console = Console()
-_last_traj_file = [""]
-_session_history: list[dict] = []
-_MAX_HISTORY = 10
+_last_traj = [""]
+_history: list[dict] = []
 
-# 预先静默加载 RAG（避免首次查询时打印加载信息）
-from contextlib import redirect_stdout
-from io import StringIO
+
+# ── 预加载 RAG（避免首次输出多余信息）──
 with redirect_stdout(StringIO()):
     try:
-        import src.handwritten_react_agent.react_loop as _rl_preload
+        import src.handwritten_react_agent.react_loop  # noqa: F401
     except Exception:
         pass
 
 
+# ── 工具 ──
+
 def _import(mod: str, name: str):
-    return getattr(importlib.import_module(mod), name)
+    return getattr(__import__(mod, fromlist=[name]), name)
 
 
-app = typer.Typer(name="hagent", no_args_is_help=True)
-
-
-# ══════════════════════════════════════════════
-#  交互模式
-# ══════════════════════════════════════════════
-
-@app.command()
-def shell(provider: str = ""):
-    """启动交互模式"""
-    if provider:
-        os.environ["LLM_PROVIDER"] = provider
-    pname = os.environ.get("LLM_PROVIDER", "default")
-    _console.print(f"hagent [dim]({pname})[/dim]  — /help")
-    _console.print()
-
-    while True:
-        try:
-            query = Prompt.ask(">")
-        except (EOFError, KeyboardInterrupt):
-            break
-        query = query.strip()
-        if not query:
-            continue
-        if query.startswith("/"):
-            _handle_cmd(query)
-            continue
-        _execute(query)
-        _console.print()
-
-
-def _handle_cmd(cmd: str):
-    c = cmd.split()[0].lower()
-    args = cmd.split(maxsplit=1)
-
-    if c in ("/exit", "/quit"):
-        raise SystemExit(0)
-    elif c == "/help":
-        _console.print("  /exit        退出")
-        _console.print("  /clear       清屏")
-        _console.print("  /config      查看配置")
-        _console.print("  /memory      查看对话历史")
-        _console.print("  /provider    切换 Provider（例：/provider openai）")
-        _console.print("  /replay      查看上一条轨迹")
-        _console.print("  /eval        评测上一条回答")
-        _console.print("  /orch        多 Agent 编排（例：/orch 查时间和算50*30）")
-    elif c == "/clear":
-        os.system("cls" if os.name == "nt" else "clear")
-    elif c == "/config":
-        _show_config()
-    elif c == "/provider" and len(args) > 1:
-        os.environ["LLM_PROVIDER"] = args[1]
-        _console.print(f"→ provider: {args[1]}")
-    elif c == "/replay":
-        _cmd_replay()
-    elif c == "/eval":
-        _cmd_eval_last()
-    elif c == "/memory":
-        if _session_history:
-            _console.print(f"[dim]对话历史 ({len(_session_history)} 条):[/]")
-            for m in _session_history[-5:]:
-                role = "你" if m["role"] == "user" else "Agent"
-                _console.print(f"  {role}: {m['content'][:100]}")
-        else:
-            _console.print("[dim]当前会话无历史[/]")
-    elif c in ("/orch", "/orchestrator") and len(args) > 1:
-        _execute_orchestrator(args[1])
-    else:
-        _console.print(f"[red]? {cmd}[/]")
-
-
-def _execute(query: str):
-    """执行查询"""
-    from contextlib import redirect_stdout
-    from io import StringIO
-    import os
-
-    # ── 分类 ──
-    try:
-        task_type = _import("intent.classifier", "IntentClassifier")().classify(query)
-    except Exception:
-        task_type = ""
-
-    # ── 权限 ──
-    HITL = _import("core.human_in_the_loop", "HumanInTheLoop")
-    PW = _import("integration.agent_wrapper", "PermissionWrapper")
-    hitl = HITL(ask_fn=_hitl_ask)
-    perm = PW(hitl=hitl)
-    from src.handwritten_react_agent.react_loop import execute_tool_call as orig
-    import src.handwritten_react_agent.react_loop as rl_mod
-    rl_mod.execute_tool_call = perm.wrap(orig)
-
-    # ── 多轮对话 ──
-    if _session_history:
-        context_summary = "\n".join(
-            f"{'你' if m['role']=='user' else '我'}: {m['content'][:200]}"
-            for m in _session_history[-3:]
-        )
-        query_with_context = (
-            f"【对话历史】\n{context_summary}\n\n"
-            f"【当前问题】\n{query}"
-        )
-    else:
-        query_with_context = query
-
-    # ── 执行（静默模式：捕获所有 print 输出）───
-    f = StringIO()
-    with redirect_stdout(f):
-        try:
-            result = rl_mod.react_loop(query_with_context, max_steps=10)
-        except Exception as e:
-            _console.print(f"[red]✗ {e}[/]")
-            return
-
-    # ── 轨迹文件路径 ──
-    _last_traj_file[0] = _find_latest_traj()
-
-    # ── 只显示最终答案 ──
-    if result:
-        _console.print(f"{result[:1000]}")
-
-    # ── 复盘 ──
-    report = perm.watch.summary()
-    if report.has_issues:
-        for ev in report.events:
-            icon = {"tool_blocked": "🔒", "tool_error": "✗",
-                    "approach_switch": "→", "search_fail": "⚠",
-                    "limit_hit": "⛔"}.get(ev.type, "•")
-            _console.print(f"  {icon} [dim]{ev.description}[/]")
-        if hitl.check_direction("重试失败路径", details=report.one_liner):
-            _console.print("↻ 重试...")
-            _execute(query)
-
-    # ── 保存对话历史 ──
-    _session_history.append({"role": "user", "content": query})
-    if result:
-        _session_history.append({"role": "assistant", "content": result[:500]})
-    if len(_session_history) > _MAX_HISTORY * 2:
-        _session_history[:-(_MAX_HISTORY * 2)] = []
-
-    # ── 快速 Eval 评分 ──
-    if task_type != "functional_test" and result:
-        _quick_eval(query, result)
-
-
-def _find_latest_traj() -> str:
-    """找最新轨迹文件"""
+def _recent_traj() -> str:
     for d in [os.path.join(_base, "src", "handwritten_react_agent", "trajectories"),
               os.path.join(_base, "trajectories")]:
         if os.path.exists(d):
@@ -195,119 +54,138 @@ def _find_latest_traj() -> str:
     return ""
 
 
-# ══════════════════════════════════════════════
-#  Eval 评分
-# ══════════════════════════════════════════════
+# ── 执行引擎 ──
 
-def _quick_eval(query: str, response: str):
-    """快速评测"""
+def _run(query: str) -> str:
+    """执行查询，返回最终答案。不打印任何中间信息。"""
+    # 分类
     try:
-        report_mod = _import("report", "run_eval")
-        fmt = _import("report", "format_text")
-        report = report_mod(response=response, context=query)
-        for line in fmt(report).split("\n")[:4]:
-            if "总体评分" in line or "评测维度" in line or "通过" in line:
-                _console.print(f"  [dim]{line.strip()}[/]")
+        Classifier = _import("intent.classifier", "IntentClassifier")
     except Exception:
-        pass
+        Classifier = None
 
+    # 权限包装
+    HITL = _import("core.human_in_the_loop", "HumanInTheLoop")
+    PW = _import("integration.agent_wrapper", "PermissionWrapper")
+    hitl = HITL(ask_fn=_hitl_ask)
+    perm = PW(hitl=hitl)
+    import src.handwritten_react_agent.react_loop as rl
+    rl.execute_tool_call = perm.wrap(rl.execute_tool_call)
 
-def _cmd_eval_last():
-    """评测上一次回答"""
-    from src.handwritten_react_agent.llm import LLM_DEFAULT
-    try:
-        _console.print("[dim]请输入要评测的回答（多行输入，空行结束）:[/]")
-        lines = []
-        while True:
-            line = input()
-            if not line:
-                break
-            lines.append(line)
-        response = "\n".join(lines)
-        if not response:
-            return
-        query = Prompt.ask("参考上下文（可选）", default="")
-        _quick_eval(query, response)
-    except Exception:
-        pass
+    # 多轮上下文
+    ctx = query
+    if _history:
+        ctx = "【历史】\n" + "\n".join(
+            f"{'Q' if m['r']=='u' else 'A'}: {m['c'][:150]}"
+            for m in _history[-3:]
+        ) + "\n【现在】\n" + query
 
+    # 执行（静默）
+    f = StringIO()
+    with redirect_stdout(f):
+        try:
+            result = rl.react_loop(ctx, max_steps=10)
+        except Exception as e:
+            return f"错误: {e}"
 
-# ══════════════════════════════════════════════
-#  Replay
-# ══════════════════════════════════════════════
+    _last_traj[0] = _recent_traj()
+    _history.append({"r": "u", "c": query})
+    if result:
+        _history.append({"r": "a", "c": result[:500]})
+    if len(_history) > 20:
+        _history[:] = _history[-20:]
 
-def _cmd_replay():
-    """查看上一条轨迹"""
-    path = _last_traj_file[0]
-    if not path or not os.path.exists(path):
-        _console.print("[dim]没有最近的轨迹[/]")
-        return
-    try:
-        import json
-        with open(path) as f:
-            d = json.load(f)
-        _console.print(f"[dim]会话: {d.get('session_id','')}[/]")
-        _console.print(f"[dim]查询: {d.get('query','')[:100]}[/]")
-        _console.print(f"[dim]步骤: {d.get('total_steps',0)} 步[/]")
-        for s in d.get("steps", []):
-            act = s.get("action", {}) or {}
-            name = act.get("name", "")
-            args = str(act.get("arguments", act.get("args", "")))[:60]
-            obs = (s.get("observation") or "")[:80]
-            if name:
-                _console.print(f"  [dim]Step {s['step']}: {name}({args})[/]")
-            elif obs:
-                _console.print(f"  [dim]Step {s['step']}: → {obs}[/]")
-    except Exception as e:
-        _console.print(f"[red]✗ {e}[/]")
+    return result or "（无输出）"
 
-
-# ══════════════════════════════════════════════
-#  HITL
-# ══════════════════════════════════════════════
-
-# ══════════════════════════════════════════════
-#  Orchestrator
-# ══════════════════════════════════════════════
-
-def _execute_orchestrator(query: str):
-    """多 Agent 编排执行"""
-    _console.print("[dim]orchestrator[/]")
-    try:
-        from src.handwritten_react_agent.orchestrator import Orchestrator
-        from src.handwritten_react_agent.react_loop import react_loop, call_llm
-        from src.handwritten_react_agent.tools import TOOL_DEFINITIONS
-
-        orch = Orchestrator(
-            call_llm_func=call_llm,
-            react_loop_func=react_loop,
-            tool_definitions=TOOL_DEFINITIONS,
-        )
-        tasks = orch.plan(query)
-        if not tasks:
-            _console.print("[red]Orchestrator 无法分解任务[/]")
-            return
-
-        result = orch.execute(query)
-        _console.print(f"\n[green]{result[:500]}[/]" if result else "[red]无结果[/]")
-
-        _session_history.append({"role": "user", "content": f"[Orchestrator] {query}"})
-        if result:
-            _session_history.append({"role": "assistant", "content": result[:500]})
-    except Exception as e:
-        _console.print(f"[red]✗ {e}[/]")
-        import traceback
-        traceback.print_exc()
-
-
-# ══════════════════════════════════════════════
-#  HITL
-# ══════════════════════════════════════════════
 
 def _hitl_ask(msg: str, choices: list[str]) -> str:
     _console.print(f"[yellow]? {msg}[/]")
-    _console.print("  1:允许 2:本次会话 3:拒绝")
+    _console.print("  1:允许 2:本次 3:拒绝")
     return Prompt.ask("", choices=choices, default="1")
+
+
+# ── 命令处理 ──
+
+def _handle(cmd: str) -> bool:
+    """处理命令。返回 True 表示退出。"""
+    parts = cmd.strip().split(maxsplit=1)
+    c = parts[0].lower()
+
+    if c in ("/exit", "/quit"):
+        return True
+    elif c == "/clear":
+        os.system("cls" if os.name == "nt" else "clear")
+    elif c == "/replay":
+        _cmd_replay()
+    elif c == "/config":
+        _cmd_config()
+    elif c == "/provider" and len(parts) > 1:
+        os.environ["LLM_PROVIDER"] = parts[1]
+        _console.print(parts[1])
+    return False
+
+
+def _cmd_replay():
+    path = _last_traj[0]
+    if not path or not os.path.exists(path):
+        _console.print("暂无轨迹")
+        return
+    try:
+        with open(path) as f:
+            d = json.load(f)
+        _console.print(f"[dim]{d.get('query','')[:80]}[/]")
+        for s in d.get("steps", []):
+            a = s.get("action", {}) or {}
+            if a.get("name"):
+                _console.print(f"  {a['name']}")
+            if s.get("observation"):
+                o = s["observation"][:80].replace("\n", " ")
+                _console.print(f"  → {o}")
+    except Exception:
+        _console.print("读取失败")
+
+
+def _cmd_config():
+    try:
+        from src.handwritten_react_agent.llm import list_providers
+        ps = list_providers()
+        cur = os.environ.get("LLM_PROVIDER", "default")
+        _console.print(f"provider: {cur} ({', '.join(ps)})")
+        key = os.environ.get("DEEPSEEK_API_KEY", "")
+        _console.print(f"api-key: {'✅' if key else '❌'}")
+    except Exception:
+        _console.print("无法读取配置")
+
+
+# ══════════════════════════════════════════════
+#  Shell
+# ══════════════════════════════════════════════
+
+app = typer.Typer(name="hagent", no_args_is_help=True)
+
+
+@app.command()
+def shell(provider: str = ""):
+    """交互模式"""
+    if provider:
+        os.environ["LLM_PROVIDER"] = provider
+
+    while True:
+        try:
+            q = Prompt.ask(">")
+        except (EOFError, KeyboardInterrupt):
+            break
+
+        q = q.strip()
+        if not q:
+            continue
+
+        if q.startswith("/"):
+            if _handle(q):
+                break
+            continue
+
+        _console.print(_run(q))
 
 
 # ══════════════════════════════════════════════
@@ -315,12 +193,9 @@ def _hitl_ask(msg: str, choices: list[str]) -> str:
 # ══════════════════════════════════════════════
 
 @app.command()
-def run(query: str = typer.Argument(...),
-        provider: str = typer.Option("", "--provider", "-p")):
-    """单次执行 Agent"""
-    if provider:
-        os.environ["LLM_PROVIDER"] = provider
-    _execute(query)
+def run(query: str = typer.Argument(...)):
+    """单次执行"""
+    _console.print(_run(query))
 
 
 # ══════════════════════════════════════════════
@@ -329,23 +204,7 @@ def run(query: str = typer.Argument(...),
 
 @app.command()
 def config():
-    """查看配置"""
-    _show_config()
-
-
-def _show_config():
-    from src.handwritten_react_agent.llm import list_providers
-    _console.print(f"provider: [cyan]{os.environ.get('LLM_PROVIDER', 'default')}[/]")
-    _console.print(f"可用: {', '.join(list_providers())}")
-    key = os.environ.get("DEEPSEEK_API_KEY", "")
-    _console.print(f"api-key: {'✅ 已配置' if key else '❌ 未配置'}")
-    Perm = _import("core.permissions", "TOOL_PERMISSIONS")
-    Arg = _import("core.permissions", "ARG_RULES")
-    levels = {}
-    for _, v in Perm.items():
-        levels[v.value] = levels.get(v.value, 0) + 1
-    _console.print(f"权限规则: {levels}")
-    _console.print(f"参数规则: {len(Arg)} 条")
+    _cmd_config()
 
 
 if __name__ == "__main__":
