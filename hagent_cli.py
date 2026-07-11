@@ -74,10 +74,10 @@ class ToolMonitor:
 
 def _run(q: str) -> str:
     try:
-        task_type = _import("intent.classifier", "IntentClassifier")().classify(q)
+        task_type = _import("handwritten_react_agent.intent.classifier", "IntentClassifier")().classify(q)
     except Exception:
         task_type = ""
-    HITL = _import("core.human_in_the_loop", "HumanInTheLoop")
+    HITL = _import("handwritten_react_agent.safety.human_in_the_loop", "HumanInTheLoop")
     PW = _import("integration.agent_wrapper", "PermissionWrapper")
     hitl = HITL(ask_fn=_hitl_ask)
     perm = PW(hitl=hitl)

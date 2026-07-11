@@ -29,13 +29,15 @@ from typing import Any, Callable, Optional
 
 # 添加 eval-engine 到路径
 _eval_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if _eval_dir not in sys.path:
-    sys.path.insert(0, _eval_dir)
+_src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "src"))
+for p in [_eval_dir, _src_dir]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
-from core.permissions import PermissionLevel, get_tool_permission, describe_action
-from core.human_in_the_loop import HumanInTheLoop
-from core.trace_watch import TraceWatch
-from intent.classifier import IntentClassifier, TaskType
+from handwritten_react_agent.safety.permissions import PermissionLevel, get_tool_permission, describe_action
+from handwritten_react_agent.safety.human_in_the_loop import HumanInTheLoop
+from handwritten_react_agent.safety.trace_watch import TraceWatch
+from handwritten_react_agent.intent.classifier import IntentClassifier, TaskType
 
 
 # ══════════════════════════════════════════════

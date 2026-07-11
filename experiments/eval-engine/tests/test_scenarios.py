@@ -20,13 +20,14 @@ import os
 import json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "src"))
 
 from core.trajectory_parser import parse_trajectory, StepsDAG
 from core.process_reward import (
     ProcessRewardScorer, ProcessRewardReport,
     analyze_error_propagation, pack_revision_instructions,
 )
-from intent.classifier import IntentClassifier, TaskType
+from handwritten_react_agent.intent.classifier import IntentClassifier, TaskType
 from loop.eval_loop import EvalLoopEngine, EvalLoopConfig
 
 
@@ -422,7 +423,7 @@ if __name__ == "__main__":
 
     # ── 场景 I: HITL 用户拒绝修正 ──
     print(f"\n  ── 场景 I: HITL 权限拦截 ──")
-    from core.human_in_the_loop import HumanInTheLoop
+    from handwritten_react_agent.safety.human_in_the_loop import HumanInTheLoop
 
     def _mock_ask_reject(msg, choices):
         return "3"  # 拒绝（在 CONFIRM 上下文中 3=拒绝）

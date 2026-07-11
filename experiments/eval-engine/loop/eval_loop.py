@@ -36,7 +36,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
-from intent.classifier import IntentClassifier, TaskType
+from handwritten_react_agent.intent.classifier import IntentClassifier, TaskType
 from core.trajectory_parser import (
     parse_trajectory,
     StepsDAG,
@@ -48,7 +48,7 @@ from core.process_reward import (
     analyze_error_propagation,
     pack_revision_instructions,
 )
-from core.human_in_the_loop import HumanInTheLoop
+from handwritten_react_agent.safety.human_in_the_loop import HumanInTheLoop
 
 
 @dataclass

@@ -3,12 +3,13 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "src"))
 
-from core.permissions import (
+from handwritten_react_agent.safety.permissions import (
     PermissionLevel, get_tool_permission, get_direction_permission,
     is_high_risk, describe_action,
 )
-from core.human_in_the_loop import HumanInTheLoop, ApprovalRecord
+from handwritten_react_agent.safety.human_in_the_loop import HumanInTheLoop, ApprovalRecord
 
 
 # ── Permissions 测试 ──

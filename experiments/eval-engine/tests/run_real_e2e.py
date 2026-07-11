@@ -34,7 +34,7 @@ from handwritten_react_agent.llm import LLM
 
 from core.trajectory_parser import parse_trajectory, dag_to_text
 from core.process_reward import ProcessRewardScorer, analyze_error_propagation
-from intent.classifier import IntentClassifier
+from handwritten_react_agent.intent.classifier import IntentClassifier
 from judge.executor import JudgeExecutor
 from observability.report import format_report
 
