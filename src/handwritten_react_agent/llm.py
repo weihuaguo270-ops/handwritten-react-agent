@@ -92,6 +92,10 @@ def _resolve_provider(name: str) -> dict:
     model_env = p.pop("model_env", "")
     if model_env:
         p["model"] = os.environ.get(model_env, p.get("model", ""))
+    # 全局 LLM_MODEL 环境变量覆盖（不依赖配置文件）
+    env_model = os.environ.get("LLM_MODEL", "")
+    if env_model:
+        p["model"] = env_model
 
     # 移除描述字段（非 payload 字段）
     p.pop("description", None)

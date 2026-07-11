@@ -124,6 +124,13 @@ def _handle(c: str) -> bool:
     x = p[0].lower()
     if x in ("/exit", "/quit"): return True
     if x == "/clear": os.system("cls" if os.name == "nt" else "clear")
+    elif x == "/model" and len(p) > 1:
+        os.environ["LLM_MODEL"] = p[1]
+        # 清除 LLM 模块缓存，下次调用读新模型
+        import src.handwritten_react_agent.llm as llm_mod
+        llm_mod._CONFIG = None
+        llm_mod.LLM_DEFAULT = None
+        _console.print(f"model: {p[1]}")
     elif x == "/replay": _replay()
     elif x == "/provider" and len(p) > 1:
         os.environ["LLM_PROVIDER"] = p[1]
