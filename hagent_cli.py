@@ -151,7 +151,7 @@ def _replay():
 #  Shell
 # ══════════════════════════════════════════════
 
-app = typer.Typer(name="hagent", no_args_is_help=True)
+app = typer.Typer(name="agent", no_args_is_help=True)
 
 
 @app.command()
@@ -162,7 +162,8 @@ def shell(provider: str = ""):
 
     while True:
         # Header
-        _console.print(f"[bold]hagent[/] [dim]{pname}[/]")
+        cur = os.environ.get("LLM_PROVIDER", "default")
+        _console.print(f"[bold]handwritten-react-agent[/] [dim]({cur})[/]")
         _console.print(dash)
 
         try:
