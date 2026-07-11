@@ -19,6 +19,7 @@ import json
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "src"))
 
 from core.contract import VerifierContract
 from core.trajectory_parser import parse_trajectory, dag_to_text, dag_summary
@@ -26,7 +27,7 @@ from core.dynamic_rubric import build_step_context, build_step_judge_prompt
 from core.process_reward import (
     ProcessRewardScorer, analyze_error_propagation, pack_revision_instructions
 )
-from intent.classifier import IntentClassifier, TaskType
+from handwritten_react_agent.intent.classifier import IntentClassifier, TaskType
 from judge.executor import JudgeExecutor, _extract_json
 from gates.baseline import BaselineManager
 from gates.regression_gate import RegressionGate

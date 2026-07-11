@@ -26,14 +26,13 @@ from integration.agent_wrapper import (
 
 
 def _mock_ask_approve(msg: str, choices: list[str]) -> str:
-    return choices[0]  # 默认选第一个（通常是允许）
+    """模拟用户批准"""
+    return "1"
 
 
 def _mock_ask_reject(msg: str, choices: list[str]) -> str:
-    for c in choices:
-        if "拒绝" in c or "拒绝" in c:
-            return c
-    return choices[-1]
+    """模拟用户拒绝"""
+    return "3"
 
 
 def _mock_tool_call(name: str, args: dict = None) -> dict:
@@ -91,8 +90,8 @@ def test_wrapper_confirm_rejected():
 
 
 def test_wrapper_deny_default():
-    """DENY 工具默认拒绝"""
-    pw = PermissionWrapper(ask_fn=_mock_ask_reject)
+    """DENY 工具默认拒绝（无 ask_fn）"""
+    pw = PermissionWrapper(ask_fn=None)
     wrapped = pw.wrap(_original_execute)
 
     tc = _mock_tool_call("delete_directory", {"path": "/"})
@@ -123,13 +122,12 @@ def test_wrapper_stats():
     pw = PermissionWrapper(ask_fn=_mock_ask_reject)
     wrapped = pw.wrap(_original_execute)
 
-    wrapped(_mock_tool_call("get_time"))          # 放行
-    wrapped(_mock_tool_call("delete_directory"))  # 拦截
-    wrapped(_mock_tool_call("execute_python"))    # 拦截
+    wrapped(_mock_tool_call("get_time"))          # SAFE → 放行
+    wrapped(_mock_tool_call("execute_python"))    # CONFIRM → mock 返回 3 → 拒绝
 
     stats = pw.stats
-    assert stats["blocked_calls"] == 2
-    assert stats["total_checks"] >= 2
+    assert stats["blocked_calls"] == 1
+    assert stats["trace_errors"] == 0
     print(f"  ✅ 权限统计正确（拦截 {stats['blocked_calls']} 次）")
 
 

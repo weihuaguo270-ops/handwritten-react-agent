@@ -29,12 +29,15 @@ from typing import Any, Callable, Optional
 
 # 添加 eval-engine 到路径
 _eval_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if _eval_dir not in sys.path:
-    sys.path.insert(0, _eval_dir)
+_src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "src"))
+for p in [_eval_dir, _src_dir]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
-from core.permissions import PermissionLevel, get_tool_permission, describe_action
-from core.human_in_the_loop import HumanInTheLoop
-from intent.classifier import IntentClassifier, TaskType
+from handwritten_react_agent.safety.permissions import PermissionLevel, get_tool_permission, describe_action
+from handwritten_react_agent.safety.human_in_the_loop import HumanInTheLoop
+from handwritten_react_agent.safety.trace_watch import TraceWatch
+from handwritten_react_agent.intent.classifier import IntentClassifier, TaskType
 
 
 # ══════════════════════════════════════════════
@@ -65,6 +68,7 @@ class PermissionWrapper:
             hitl:   可复用的 HITL 管理器。如果提供，则忽略 ask_fn
         """
         self.hitl = hitl or HumanInTheLoop(ask_fn=ask_fn)
+        self.watch = TraceWatch(hitl=self.hitl)  # 绑定路径监控
         self._blocked_calls: list[dict] = []
 
     def check_tool_call(
@@ -113,10 +117,13 @@ class PermissionWrapper:
             # 权限检查
             block_reason = self.check_tool_call(func_name, arguments)
             if block_reason:
+                self.watch.on_tool_call(func_name, arguments, block_reason)
                 return json.dumps({"error": block_reason, "blocked": True})
 
             # 权限通过 → 调用原始函数
-            return original_fn(tool_call)
+            result = original_fn(tool_call)
+            self.watch.on_tool_call(func_name, arguments, result)
+            return result
 
         return wrapped
 
@@ -126,9 +133,12 @@ class PermissionWrapper:
 
     @property
     def stats(self) -> dict:
+        report = self.watch.summary()
         return {
             **self.hitl.stats(),
             "blocked_calls": self.blocked_count,
+            "trace_errors": report.error_count,
+            "trace_switches": report.switch_count,
         }
 
 

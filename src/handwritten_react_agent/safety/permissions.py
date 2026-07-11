@@ -7,34 +7,38 @@
   NOTIFY   — 读取敏感信息，通知用户但不阻塞
   CONFIRM  — 写入/执行，需用户确认
   DENY     — 破坏性操作，默认拒绝（除非用户明确覆盖）
-"""
 
+v2 新增：参数级权限（Argument Rules）
+  根据工具参数动态调整权限等级：
+    write_file /tmp/* → SAFE（临时文件）
+    write_file /etc/* → CONFIRM（系统配置）
+    execute_python 含 os.system → 自动提升为 CONFIRM
+"""
 from __future__ import annotations
 from enum import Enum
-from typing import Optional
+from typing import Any, Callable, Optional
 
 
 class PermissionLevel(Enum):
     """操作权限等级"""
-    SAFE = "safe"           # 安全操作，自动放行
-    NOTIFY = "notify"       # 通知用户但不阻塞
-    CONFIRM = "confirm"     # 需用户确认
-    DENY = "deny"           # 默认拒绝，需用户明确覆盖
+    SAFE = "safe"
+    NOTIFY = "notify"
+    CONFIRM = "confirm"
+    DENY = "deny"
 
 
 class Category(Enum):
     """操作分类"""
-    TOOL_CALL = "tool_call"           # Agent 调用工具
-    DIRECTION_CHANGE = "direction"    # Eval Loop 改变执行方向
-    RETRY = "retry"                   # 重试步骤
-    CORRECT = "correct"               # 修正指令注入
+    TOOL_CALL = "tool_call"
+    DIRECTION_CHANGE = "direction"
+    RETRY = "retry"
+    CORRECT = "correct"
 
 
-# ── 工具权限表 ──
-# 每新增一个工具，在这里添加权限等级
+# ── 工具权限表（工具名 → 默认等级） ──
 
 TOOL_PERMISSIONS: dict[str, PermissionLevel] = {
-    # ── SAFE：只读/信息类 ──
+    # SAFE
     "get_time": PermissionLevel.SAFE,
     "get_current_time": PermissionLevel.SAFE,
     "convert_time": PermissionLevel.SAFE,
@@ -49,7 +53,7 @@ TOOL_PERMISSIONS: dict[str, PermissionLevel] = {
     "directory_tree": PermissionLevel.SAFE,
     "list_allowed_directories": PermissionLevel.SAFE,
 
-    # ── NOTIFY：可能涉及敏感信息，通知用户 ──
+    # NOTIFY
     "get_file_info": PermissionLevel.NOTIFY,
     "read_env": PermissionLevel.NOTIFY,
     "mcp_list_tools": PermissionLevel.NOTIFY,
@@ -58,7 +62,7 @@ TOOL_PERMISSIONS: dict[str, PermissionLevel] = {
     "get_memory": PermissionLevel.NOTIFY,
     "search_memory": PermissionLevel.NOTIFY,
 
-    # ── CONFIRM：写操作，需用户确认 ──
+    # CONFIRM
     "write_file": PermissionLevel.CONFIRM,
     "patch_file": PermissionLevel.CONFIRM,
     "execute_python": PermissionLevel.CONFIRM,
@@ -70,7 +74,7 @@ TOOL_PERMISSIONS: dict[str, PermissionLevel] = {
     "delete_file": PermissionLevel.CONFIRM,
     "create_file": PermissionLevel.CONFIRM,
 
-    # ── DENY：破坏性操作，默认拒绝 ──
+    # DENY
     "delete_directory": PermissionLevel.DENY,
     "format_disk": PermissionLevel.DENY,
     "shutdown": PermissionLevel.DENY,
@@ -80,9 +84,7 @@ TOOL_PERMISSIONS: dict[str, PermissionLevel] = {
     "uninstall_package": PermissionLevel.DENY,
 }
 
-
 # ── 方向调整权限 ──
-# Eval Loop 在做出某些自动决策前，需要用户确认
 
 DIRECTION_CHANGE_LEVELS: dict[str, PermissionLevel] = {
     "修正指令注入": PermissionLevel.CONFIRM,
@@ -96,32 +98,95 @@ DIRECTION_CHANGE_LEVELS: dict[str, PermissionLevel] = {
 }
 
 
+# ── 参数级规则（v2） ──
+# (工具名, 参数匹配函数, 覆盖后的等级)
+# 匹配函数返回 True 时，使用该等级覆盖默认等级
+# 从上到下匹配，返回第一个匹配的规则
+
+ArgChecker = Callable[[dict[str, Any]], bool]
+
+
+def _path_contains(substring: str) -> ArgChecker:
+    """参数中的 path 包含指定子串"""
+    def check(args: dict) -> bool:
+        path = str(args.get("path", "") or args.get("filepath", "") or "")
+        return substring in path
+    return check
+
+
+def _code_contains(keyword: str) -> ArgChecker:
+    """代码参数包含指定关键词"""
+    def check(args: dict) -> bool:
+        code = str(args.get("code", "") or args.get("command", "") or "")
+        return keyword in code
+    return check
+
+
+def _key_contains(keyword: str) -> ArgChecker:
+    """任意参数值包含指定关键词"""
+    def check(args: dict) -> bool:
+        for v in args.values():
+            if keyword in str(v).lower():
+                return True
+        return False
+    return check
+
+
+# 参数级规则表
+ARG_RULES: list[tuple[str, ArgChecker, PermissionLevel]] = [
+    # --- 敏感内容优先检测（高于路径规则）---
+    ("write_file", _key_contains("password"), PermissionLevel.DENY),
+    ("write_file", _key_contains("secret"), PermissionLevel.DENY),
+    ("write_file", _key_contains("api_key"), PermissionLevel.DENY),
+
+    # write_file 路径级
+    ("write_file", _path_contains("/tmp/"), PermissionLevel.SAFE),
+    ("write_file", _path_contains("/Temp/"), PermissionLevel.SAFE),
+    ("write_file", _path_contains("temp"), PermissionLevel.SAFE),
+    ("write_file", _path_contains("/etc/"), PermissionLevel.CONFIRM),
+    ("write_file", _path_contains("/usr/"), PermissionLevel.CONFIRM),
+
+    # execute_python 内容级
+    ("execute_python", _code_contains("os.system"), PermissionLevel.CONFIRM),
+    ("execute_python", _code_contains("subprocess"), PermissionLevel.CONFIRM),
+    ("execute_python", _code_contains("shutil.rmtree"), PermissionLevel.DENY),
+    ("execute_python", _code_contains("os.remove"), PermissionLevel.CONFIRM),
+    ("execute_python", _code_contains("__import__"), PermissionLevel.CONFIRM),
+]
+
+
 # ── 查询函数 ──
 
 
-def get_tool_permission(tool_name: str) -> PermissionLevel:
-    """获取工具的权限等级
+def get_tool_permission(
+    tool_name: str,
+    tool_args: Optional[dict] = None,
+) -> PermissionLevel:
+    """获取工具的权限等级（支持参数级覆盖）
 
-    不在表中的工具默认 SAFE（安全优先原则）。
+    先检查参数级规则，未命中则返回默认等级。
+    不在表中的工具默认 SAFE。
     """
+    if tool_args:
+        for name, checker, level in ARG_RULES:
+            if name == tool_name and checker(tool_args):
+                return level
+
     return TOOL_PERMISSIONS.get(tool_name, PermissionLevel.SAFE)
 
 
 def get_direction_permission(action: str) -> PermissionLevel:
-    """获取方向调整操作的权限等级"""
     return DIRECTION_CHANGE_LEVELS.get(action, PermissionLevel.CONFIRM)
 
 
 def is_high_risk(level: PermissionLevel) -> bool:
-    """是否高风险操作（需要用户参与）"""
     return level in (PermissionLevel.CONFIRM, PermissionLevel.DENY)
 
 
 def describe_action(tool_name: str, args: Optional[dict] = None) -> str:
-    """生成操作的可读描述（供用户确认时看）"""
+    """生成操作的可读描述"""
     desc = f"调用工具：{tool_name}"
     if args:
-        # 简略显示参数，敏感信息截断
         args_summary = {}
         for k, v in (args or {}).items():
             if isinstance(v, str) and len(v) > 100:

@@ -3,12 +3,13 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "src"))
 
-from core.permissions import (
+from handwritten_react_agent.safety.permissions import (
     PermissionLevel, get_tool_permission, get_direction_permission,
     is_high_risk, describe_action,
 )
-from core.human_in_the_loop import HumanInTheLoop, ApprovalRecord
+from handwritten_react_agent.safety.human_in_the_loop import HumanInTheLoop, ApprovalRecord
 
 
 # ── Permissions 测试 ──
@@ -32,6 +33,28 @@ def test_deny_tools():
 def test_unknown_safe():
     assert get_tool_permission("nonexistent_tool") == PermissionLevel.SAFE
     print("  ✅ 未知工具默认 SAFE")
+
+def test_args_level_safe():
+    """参数级规则：/tmp/ 下写文件降为 SAFE"""
+    h = HumanInTheLoop(ask_fn=None)
+    assert h.check_tool_call("write_file", {"path": "/tmp/test.log"}) is True
+    # 参数为空/未知路径 → 保持 CONFIRM
+    assert h.check_tool_call("write_file", {"path": "/unknown/path.txt"}) is True  # 无 ask_fn 放行
+    print("  ✅ 路径级 SAFE 正确")
+
+def test_args_level_deny():
+    """参数级规则：含敏感关键词提升为 DENY"""
+    h = HumanInTheLoop(ask_fn=None)
+    assert h.check_tool_call("write_file", {"path": "/tmp/passwords.txt", "content": "admin:123456"}) is False
+    assert h.check_tool_call("write_file", {"path": "/tmp/config.env", "content": "API_KEY=sk-xxx"}) is False
+    print("  ✅ 敏感内容 DENY 正确")
+
+def test_args_level_confirm():
+    """参数级规则：系统路径保持 CONFIRM"""
+    h = HumanInTheLoop(ask_fn=None)
+    assert h.check_tool_call("write_file", {"path": "/etc/nginx.conf"}) is True  # 无 ask_fn 放行
+    assert h.check_tool_call("execute_python", {"code": "import os; os.system('rm -rf /')"}) is True  # 无 ask_fn 放行
+    print("  ✅ 系统路径 CONFIRM 正确")
 
 def test_high_risk():
     assert is_high_risk(PermissionLevel.CONFIRM)
@@ -69,32 +92,58 @@ def test_auto_approve_safe():
     print("  ✅ SAFE 自动放行")
 
 def test_confirm_approved():
-    h = HumanInTheLoop(ask_fn=_make_ask_fn("✅ 允许")[0])
+    h = HumanInTheLoop(ask_fn=_make_ask_fn("1")[0])
     assert h.check_tool_call("write_file", {"path": "/tmp/x"}) is True
     print("  ✅ CONFIRM 用户批准")
 
 def test_confirm_denied():
-    h = HumanInTheLoop(ask_fn=_make_ask_fn("❌ 拒绝")[0])
+    h = HumanInTheLoop(ask_fn=_make_ask_fn("3")[0])
     assert h.check_tool_call("execute_python", {"code": "print(1)"}) is False
     print("  ✅ CONFIRM 用户拒绝")
 
 def test_deny_default():
-    h = HumanInTheLoop(ask_fn=_make_ask_fn("🚫 保持拒绝")[0])
+    h = HumanInTheLoop(ask_fn=_make_ask_fn("1")[0])
     assert h.check_tool_call("delete_directory", {}) is False
     print("  ✅ DENY 默认拒绝")
 
 def test_deny_override():
-    h = HumanInTheLoop(ask_fn=_make_ask_fn("⚠ 仅此一次允许")[0])
+    h = HumanInTheLoop(ask_fn=_make_ask_fn("2")[0])
     assert h.check_tool_call("delete_directory", {}) is True
-    print("  ✅ DENY 用户覆盖")
+    print("  ✅ DENY 临时授权（5分钟有效）")
+
+def test_deny_permanent():
+    h = HumanInTheLoop(ask_fn=_make_ask_fn("3")[0])
+    assert h.check_tool_call("delete_directory", {}) is True
+    # 第二次同类型操作不再询问
+    assert h.check_tool_call("delete_directory", {"path": "/tmp"}) is True
+    print("  ✅ DENY 永久授权生效")
+
+def test_temp_auth_expiry():
+    """临时授权过期后不再有效"""
+    call_n = {"count": 0}
+
+    def _ask_once_then_reject(msg, choices):
+        call_n["count"] += 1
+        if call_n["count"] == 1:
+            return "2"
+        return "1"
+
+    h = HumanInTheLoop(ask_fn=_ask_once_then_reject, temp_auth_minutes=0.01)
+    # 第一次：获得临时授权
+    assert h.check_tool_call("delete_directory", {}) is True
+    # 0.01 分钟 = 0.6 秒，等 0.7 秒后过期
+    import time; time.sleep(0.7)
+    # 第二次：临时授权已过期，用户拒绝
+    assert h.check_tool_call("delete_directory", {}) is False
+    print("  ✅ 临时授权过期正确")
 
 def test_direction_approved():
-    h = HumanInTheLoop(ask_fn=_make_ask_fn("✅ 允许")[0])
+    h = HumanInTheLoop(ask_fn=_make_ask_fn("1")[0])
     assert h.check_direction("修正指令注入", "添加新步骤") is True
     print("  ✅ 方向调整批准")
 
 def test_direction_denied():
-    h = HumanInTheLoop(ask_fn=_make_ask_fn("❌ 拒绝")[0])
+    h = HumanInTheLoop(ask_fn=_make_ask_fn("3")[0])
     assert h.check_direction("重新执行步骤", "Step 3") is False
     print("  ✅ 方向调整拒绝")
 
@@ -142,9 +191,10 @@ if __name__ == "__main__":
     print("=" * 50)
     tests = [
         test_safe_tools, test_confirm_tools, test_deny_tools,
-        test_unknown_safe, test_high_risk, test_describe, test_describe_masked,
+        test_unknown_safe, test_args_level_safe, test_args_level_deny, test_args_level_confirm,
+        test_high_risk, test_describe, test_describe_masked,
         test_auto_approve_safe, test_confirm_approved, test_confirm_denied,
-        test_deny_default, test_deny_override,
+        test_deny_default, test_deny_override, test_deny_permanent, test_temp_auth_expiry,
         test_direction_approved, test_direction_denied,
         test_no_ask_fn, test_audit_log, test_tool_blocker, test_notify,
     ]

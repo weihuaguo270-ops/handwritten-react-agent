@@ -92,6 +92,10 @@ def _resolve_provider(name: str) -> dict:
     model_env = p.pop("model_env", "")
     if model_env:
         p["model"] = os.environ.get(model_env, p.get("model", ""))
+    # 全局 LLM_MODEL 环境变量覆盖（不依赖配置文件）
+    env_model = os.environ.get("LLM_MODEL", "")
+    if env_model:
+        p["model"] = env_model
 
     # 移除描述字段（非 payload 字段）
     p.pop("description", None)
@@ -175,20 +179,24 @@ class LLM:
         body = json.dumps(payload).encode("utf-8")
         r = req.Request(url, data=body, headers=headers, method="POST")
 
-        for attempt in range(max_retries):
-            try:
-                with req.urlopen(r, timeout=60) as resp:
-                    result = json.loads(resp.read().decode("utf-8"))
-                    return result["choices"][0]["message"]
-            except URLError as e:
-                if attempt < max_retries - 1:
-                    time.sleep(1)
-                    continue
-                return {"role": "assistant", "content": f"LLM调用失败: {e}"}
-            except json.JSONDecodeError as e:
-                return {"role": "assistant", "content": f"解析LLM返回失败: {e}"}
+        # 使用 resilience 模块的 retry 机制
+        from handwritten_react_agent.resilience import retry, classify_error
 
-        return {"role": "assistant", "content": "超过最大重试次数"}
+        @retry(max_attempts=3, base_delay=1.0, max_delay=10.0,
+               on_retry=lambda a, m, w, c, e: print(f"  [重试] {a}/{m} ({c}) 等待 {w:.0f}s"))
+        def _do_request():
+            with req.urlopen(r, timeout=60) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+                return result["choices"][0]["message"]
+
+        try:
+            return _do_request()
+        except URLError as e:
+            return {"role": "assistant", "content": f"LLM调用失败: {e}"}
+        except json.JSONDecodeError as e:
+            return {"role": "assistant", "content": f"解析LLM返回失败: {e}"}
+        except Exception as e:
+            return {"role": "assistant", "content": f"LLM调用异常: {e}"}
 
     def __repr__(self) -> str:
         return f"LLM(provider={self.provider_name}, model={self.model})"
