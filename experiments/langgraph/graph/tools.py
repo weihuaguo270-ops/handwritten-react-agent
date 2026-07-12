@@ -121,12 +121,71 @@ def web_search(query: str, max_results: int = 3) -> str:
         return f"搜索出错: {e}"
 
 
+# ============================================================
+# 新增工具（从手写版迁移）
+# ============================================================
+
+
+@tool
+def fetch_page(url: str) -> str:
+    """
+    获取网页的正文内容（去除 HTML 标签后的纯文本）。
+    当需要阅读某个具体网页的完整内容时使用。
+
+    参数:
+        url: 网页的完整 URL，必须包含 http:// 或 https://
+    """
+    try:
+        import urllib.request
+        import re
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            html = resp.read().decode("utf-8", errors="replace")
+        # 简易 HTML 去标签
+        text = re.sub(r"<style[^>]*>.*?</style>", "", html, flags=re.DOTALL)
+        text = re.sub(r"<script[^>]*>.*?</script>", "", text, flags=re.DOTALL)
+        text = re.sub(r"<[^>]+>", " ", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        # 截取前 3000 字符
+        return text[:3000] + "..." if len(text) > 3000 else text
+    except Exception as e:
+        return f"获取网页失败: {e}"
+
+
+@tool
+def execute_python(code: str) -> str:
+    """
+    在沙箱环境中执行 Python 代码并返回输出。
+    适用于需要计算结果或运行脚本的场景。
+
+    参数:
+        code: 要执行的 Python 代码
+    """
+    import sys
+    from io import StringIO
+
+    old_stdout = sys.stdout
+    sys.stdout = mystdout = StringIO()
+    try:
+        exec(code, {"__builtins__": __builtins__})
+        sys.stdout = old_stdout
+        output = mystdout.getvalue()
+        return output if output else "代码执行成功（无输出）"
+    except Exception as e:
+        sys.stdout = old_stdout
+        return f"执行错误: {e}"
+
+
 # 工具函数清单
 def get_tools():
     """返回所有可用工具的列表"""
     from rag import rag_query as _rag
     from rag import web_rag as _web_rag
-    return [get_current_time, calculator, web_search, _rag, _web_rag]
+    return [get_current_time, calculator, web_search, fetch_page, execute_python,
+            _rag, _web_rag]
 
 
 # ============================================================
@@ -137,6 +196,8 @@ TOOL_PROFILES = {
     "time": {"get_current_time"},
     "calc": {"calculator"},
     "web": {"web_search"},
+    "page": {"fetch_page"},
+    "code": {"execute_python"},
     "summary": {"rag_query"},
     "web_rag": {"web_rag"},
 }
