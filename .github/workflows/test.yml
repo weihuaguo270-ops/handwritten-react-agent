@@ -54,21 +54,10 @@ jobs:
       run: python examples/agent_to_eval.py
     - name: Verify eval-engine scoring path
       run: python -c "
+import sys; sys.path.insert(0, 'src')
 from react_agent.eval.scorer import score_with_eval_engine
-from react_agent.eval.dataset import TestCase
-
-case = TestCase(question='test', expected_output='ok', expected_tool='web_search')
-traj = {
-    'session_id': 'ci_test',
-    'query': 'test',
-    'steps': [
-        {'step': 0, 'thought': 'search', 'action': {'name': 'web_search', 'arguments': '{}'}, 'observation': 'result'},
-        {'step': 1, 'thought': 'done', 'observation': ''},
-    ],
-    'final_answer': 'ok',
-}
-result = score_with_eval_engine(case, traj)
-assert result is not None, 'score_with_eval_engine returned None'
-assert 'eval_engine' in result, 'not using eval-engine'
-print(f'✅ eval-engine scoring: score={result["total"]}/{result["max_score"]}')
+traj = {'session_id': 'ci_test', 'query': 'test', 'steps': [{'step': 0, 'thought': 'search', 'action': {'name': 'web_search', 'arguments': '{}'}, 'observation': 'result'}], 'final_answer': 'ok'}
+result = score_with_eval_engine({'question': 'test', 'expected_tool': 'web_search'}, traj)
+assert result is not None and result.get('eval_engine') is True
+print(f'OK score={result["total"]}/{result["max_score"]}')
 "
