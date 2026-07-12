@@ -255,13 +255,13 @@ class ContextManager:
         # 如果只有 system + 最近 2 轮，不值得摘要
         if len(messages) <= system_idx + 5:
             self.last_action = "对话太短，不适合摘要"
-            return self._truncate(messages, check)
+            return self._truncate(messages)
 
         # 要压缩的部分：system 之后到最近 2 轮之前
         summarize_end = len(messages) - 4  # 保留最近 2 轮（user + assistant）
         if summarize_end <= system_idx + 1:
             self.last_action = "对话太短，不适合摘要"
-            return self._truncate(messages, check)
+            return self._truncate(messages)
 
         # 提取要压缩的文本
         to_summarize = []
@@ -279,7 +279,7 @@ class ContextManager:
         history_text = "\n".join(to_summarize)
         if not history_text.strip():
             self.last_action = "无可摘要的内容"
-            return self._truncate(messages, check)
+            return self._truncate(messages)
 
         # 调 LLM 生成摘要
         prompt = f"""请将以下对话历史压缩成一段简短摘要，保留所有关键事实和用户意图。
@@ -294,7 +294,7 @@ class ContextManager:
             summary = reply.strip() if reply else ""
             if not summary:
                 self.last_action = "摘要生成失败，回退到截断"
-                return self._truncate(messages, check)
+                return self._truncate(messages)
 
             # 用一条摘要消息替换被压缩的部分
             summary_msg = {"role": "system", "content": f"[对话摘要] {summary}"}
