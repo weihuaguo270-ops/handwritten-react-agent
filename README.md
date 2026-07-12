@@ -1,95 +1,89 @@
 # ReAct Agent Framework
 
-**Production-grade Agent framework with dual implementation** — a handcrafted runtime for transparency and full control, plus a LangGraph-based version for production deployment. 14 modules covering RAG, MCP tool integration, multi-agent orchestration, execution recording/replay, and safety guardrails.
+**生产级 ReAct Agent 框架，双实现路线** — 手写版用于深入理解和完全控制，LangGraph 版用于生产部署。14 个模块覆盖 RAG、MCP 工具集成、多 Agent 编排、执行录制回放和安全护栏。
 
-## Overview
+## 架构概览
 
-This framework provides two complementary implementations of the ReAct (Reasoning + Acting) agent pattern:
+框架提供两种互补的 ReAct Agent 实现：
 
-| Aspect | Handcrafted Runtime (`src/`) | LangGraph Framework (`experiments/langgraph/`) |
-|--------|------------------------------|-----------------------------------------------|
-| **Dependencies** | Python stdlib + LLM API only | LangChain + LangGraph |
-| **Purpose** | Transparency, learning internals | Production scalability |
-| **Control** | Full — every line of the loop | Graph-based orchestration |
-| **State management** | Manual | LangGraph's built-in |
+| 维度 | 手写版（`src/`） | LangGraph 版（`experiments/langgraph/`） |
+|------|-----------------|----------------------------------------|
+| **依赖** | Python 标准库 + LLM API | LangChain + LangGraph |
+| **目标** | 完全透明，每行代码可控 | 生产级可扩展部署 |
+| **状态管理** | 手动管理 | LangGraph 内置 graph 状态 |
 
-## Architecture
-
-### Execution Flow
+### 执行流程
 
 ```
-query input
+query 输入
   │
-  ├── Direct entry → react_loop()
+  ├── 普通入口 → react_loop()
   │     │
-  │     ├── Step 0: Build system prompt (base + role injection + CoT strategy)
-  │     ├── Step 1: LLM call → thought/action
-  │     ├── Step 2: Tool execution (with permission checking)
-  │     ├── Step 3: Observation integration
-  │     └── Loop until final answer
+  │     ├── Step 0: 构建 system prompt（base + 角色注入 + CoT 策略）
+  │     ├── Step 1: LLM 调用 → thought/action
+  │     ├── Step 2: 工具执行（权限检查）
+  │     ├── Step 3: 观察结果集成
+  │     └── 循环直至输出最终答案
   │
-  └── Orchestrator entry
-        ├── plan() → decompose tasks (with dependency tracking)
-        ├── run_worker() → each subtask runs independent react_loop()
-        └── synthesize() → merge results
+  └── Orchestrator 入口
+        ├── plan() → 任务分解（带依赖追踪）
+        ├── run_worker() → 每个子任务独立运行 react_loop()
+        └── synthesize() → 汇总结果
 ```
 
-### Module Map
+### 模块清单
 
 ```
 react_agent/
 │
-├── react_loop.py         Core ReAct loop (thought → action → observation)
-├── llm.py                LLM provider abstraction (multi-provider, configurable)
-├── tools/                Tool registry + built-in tools
-│   ├── web_search.py     Web search
-│   ├── fetch_page.py     Page content extraction
-│   ├── execute_python.py Python sandbox execution
-│   ├── calculator.py     Arithmetic calculator
-│   ├── get_time.py       Time utility
-│   ├── summarize.py      Text summarization
-│   └── dashboard.py      Web dashboard integration
-├── context.py            Context management
-├── memory.py             Conversation memory
-├── cot.py                Chain-of-Thought strategy injection
-├── tot.py                Tree-of-Thought tool integration
-├── prompts.py            System prompt construction
-├── rag.py                Retrieval-Augmented Generation
+├── react_loop.py        核心 ReAct 循环（thought → action → observation）
+├── llm.py               LLM Provider 抽象（多 provider 切换）
+├── tools/               工具注册 + 内置工具集
+│   ├── web_search.py    网络搜索
+│   ├── fetch_page.py    页面内容提取
+│   ├── execute_python.py Python 沙箱执行
+│   ├── calculator.py    计算器
+│   └── ...
+├── context.py           上下文管理
+├── memory.py            对话记忆
+├── cot.py               Chain-of-Thought 策略注入
+├── tot.py               Tree-of-Thought 工具集成
+├── prompts.py           System Prompt 构建
+├── rag.py               检索增强生成
 │
-├── orchestrator.py       Multi-agent task decomposition + synthesis
-├── planner.py            Task planning with dependency resolution
-├── mcp_client.py         MCP (Model Context Protocol) client for external tools
+├── orchestrator.py      多 Agent 任务分解 + 汇总
+├── planner.py           任务规划 + 依赖解析
+├── mcp_client.py        MCP 协议客户端
 │
-├── eval/                 Evaluation & scoring
-│   ├── runner.py         Batch evaluation runner
-│   ├── scorer.py         Scoring functions
-│   ├── dataset.py        Dataset loading
-│   └── report.py         Report generation
+├── eval/                评估与评分
+│   ├── runner.py        批量评估
+│   ├── scorer.py        评分函数
+│   ├── dataset.py       数据集加载
+│   └── report.py        报告生成
 │
-├── harness/              Execution recording & replay
-│   ├── recorder.py       Full trajectory recording
-│   ├── replay.py         Step-by-step replay
-│   └── sandbox.py        Isolated execution sandbox
+├── harness/             执行录制与回放
+│   ├── recorder.py      完整轨迹录制
+│   ├── replay.py        逐步骤回放
+│   └── sandbox.py       隔离执行沙箱
 │
-├── safety/               Safety & permissions
-│   ├── permissions.py    Hierarchical permission system (SAFE/NOTIFY/CONFIRM/DENY)
-│   ├── human_in_the_loop.py Human oversight callbacks
-│   └── trace_watch.py    Execution trace monitoring
+├── safety/              安全与权限
+│   ├── permissions.py   四级权限系统（SAFE/NOTIFY/CONFIRM/DENY）
+│   ├── human_in_the_loop.py 人工审批
+│   └── trace_watch.py   执行轨迹监控
 │
-├── intent/               Task classification
-│   └── classifier.py     Intent classification (functional test vs generative)
+├── intent/              任务分类
+│   └── classifier.py    意图识别（功能测试 vs 生成式任务）
 │
-├── dashboard/            Real-time execution visualization
-│   └── server.py         Web dashboard
+├── dashboard/           实时执行可视化
 │
-└── resilience.py         Error handling & retry logic
+└── resilience.py        错误处理与重试
 ```
 
-## Key Features
+## 核心功能
 
-### Multi-Provider LLM Support
+### 多 Provider LLM 支持
 
-Switch providers via environment variable without code changes:
+环境变量切换，无需改代码：
 
 ```bash
 export LLM_PROVIDER=deepseek
@@ -97,89 +91,83 @@ export LLM_PROVIDER=openai
 export LLM_PROVIDER=anthropic
 ```
 
-Provider configuration in `llm_config.json` with per-provider API keys, base URLs, and model names.
+`llm_config.json` 中配置各 provider 的 API key、base URL 和模型名。
 
-### Permission & Safety System
+### 权限安全系统
 
-Four-level permission hierarchy for tool calls:
+四级权限控制工具调用：
 
-| Level | Behavior | Use Case |
-|-------|----------|----------|
-| SAFE | Auto-approve | web_search, calculator |
-| NOTIFY | Log + continue | fetch_page (external domains) |
-| CONFIRM | Ask user | write_file, execute_python |
-| DENY | Block | rm -rf, sensitive paths |
+| 等级 | 行为 | 适用场景 |
+|------|------|---------|
+| SAFE | 自动放行 | web_search、calculator |
+| NOTIFY | 记录 + 继续 | fetch_page（外部域名） |
+| CONFIRM | 询问用户 | write_file、execute_python |
+| DENY | 拦截 | rm -rf、敏感路径 |
 
-### Execution Recording
+### 执行轨迹录制
 
-Full trajectory capture enables post-hoc analysis:
+完整录制每步 thought/action/observation，支持事后分析和回放：
 
 ```python
 from react_agent.harness.recorder import current_trajectory
 
-# Record every thought, action, and observation
-result = react_loop("Analyze this dataset")
+result = react_loop("分析这份数据")
 trajectory = current_trajectory()
 
-# Replay later
+# 逐步骤回放
 from react_agent.harness.replay import replay_trajectory
 replay_trajectory(trajectory)
 ```
 
-### RAG & MCP Integration
+### RAG 与 MCP 集成
 
-- **RAG**: Document ingestion, chunking, embedding, and retrieval with configurable vector store
-- **MCP Client**: Connect to external MCP servers for tool discovery and invocation
+- **RAG**：文档摄入、分块、嵌入、检索，可配置向量存储
+- **MCP Client**：连接外部 MCP 服务器，自动发现并调用工具
 
-### Multi-Agent Orchestration
+### 多 Agent 编排
 
-Complex tasks are decomposed into subtasks with dependency tracking:
+复杂任务自动分解为带依赖的子任务：
 
 ```python
 from react_agent.orchestrator import Orchestrator
 
 orc = Orchestrator()
-plan = orc.plan("Research and write a report about AI trends")
-# → [task_1: search_trends, task_2: analyze, task_3: write_report]
-#   task_2 depends on task_1, task_3 depends on task_1 + task_2
+plan = orc.plan("调研并撰写 AI 趋势报告")
+# → [task_1: 搜索趋势, task_2: 分析数据, task_3: 撰写报告]
+#   task_2 依赖 task_1，task_3 依赖 task_1 + task_2
 
 results = orc.execute(plan)
 ```
 
-## LangGraph Version (`experiments/langgraph/`)
+## LangGraph 版（`experiments/langgraph/`）
 
-A Graph-based implementation using LangChain/LangGraph with the same feature set, suitable for production deployment where framework integration is preferred.
+基于 LangChain/LangGraph 的图计算实现，适用于生产环境中需要框架集成的场景。功能等价于手写版：可配置 Agent 图、上下文管理、MCP 工具、RAG pipeline、执行录制、记忆管理、多 Agent 编排。
 
-Includes: configurable agent graph, context management, MCP tool integration, RAG pipeline, execution harness, memory management, and multi-agent orchestration.
-
-## Getting Started
+## 快速开始
 
 ```bash
-# Install
 pip install -e .
-
-# Configure LLM provider
 cp .env.example .env
-# Edit .env with your API keys
+# 编辑 .env 填入 API key
 
-# Run
-python -m react_agent "What is the capital of France?"
+# 运行
+python -m react_agent "法国的首都是什么？"
 
-# Web dashboard
+# 启动 Web 面板
 python -m react_agent.dashboard.server
 ```
 
-## Requirements
+## 环境要求
 
 - Python 3.10+
-- LLM API key (any provider)
-- LangChain + LangGraph (for `experiments/langgraph/`, optional)
+- LLM API key
+- LangChain + LangGraph（experiments/langgraph/ 需要，可选）
 
-## Related Projects
+## 相关项目
 
-- [llm-eval-engine](https://github.com/weihuaguo270-ops/llm-eval-engine) — Production-grade LLM evaluation framework
-- [attention-from-scratch](https://github.com/weihuaguo270-ops/attention-from-scratch) — NumPy/PyTorch Transformer attention mechanisms
-- [trace-debugger](https://github.com/weihuaguo270-ops/trace-debugger) — Agent execution trace analyzer
+- [llm-eval-engine](https://github.com/weihuaguo270-ops/llm-eval-engine) — 生产级 LLM 评估框架
+- [attention-from-scratch](https://github.com/weihuaguo270-ops/attention-from-scratch) — NumPy/PyTorch Transformer Attention 实现
+- [trace-debugger](https://github.com/weihuaguo270-ops/trace-debugger) — Agent 执行轨迹分析工具
 
 ## License
 
