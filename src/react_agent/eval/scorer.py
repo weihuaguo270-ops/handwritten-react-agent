@@ -168,3 +168,74 @@ def _score_answer(stdout: str, trajectory: Optional[dict]) -> dict:
     if has_final or has_traj_answer:
         return {"passed": True, "reason": "有最终答案"}
     return {"passed": False, "reason": "无最终答案"}
+
+
+# ──────────────────────────────────────────────
+# 可选：使用 llm-eval-engine 评分（取代关键词匹配）
+# ──────────────────────────────────────────────
+
+
+def score_with_eval_engine(case, trajectory: dict) -> Optional[dict]:
+    """使用 llm-eval-engine 的 Process Reward 评分
+
+    需安装 llm-eval-engine: pip install -e /path/to/llm-eval-engine
+    未安装时自动回退到关键词评分（score_result）
+
+    参数:
+        case: TestCase 对象
+        trajectory: Harness 格式的轨迹字典
+
+    返回:
+        eval-engine 评分报告，或 None（回退到关键词评分时）
+    """
+    try:
+        from eval_engine.core.trajectory_parser import parse_trajectory
+        from eval_engine.core.process_reward import ProcessRewardScorer
+        from eval_engine.core.contract import VerifierContract
+    except ImportError:
+        return None  # 未安装 llm-eval-engine，回退
+
+    try:
+        dag = parse_trajectory(trajectory)
+
+        # 从测试用例中提取预期工具作为评分标准
+        contracts = []
+        expected_tool = getattr(case, "expected_tool", None)
+        if expected_tool:
+            contracts.append(VerifierContract(
+                name="tool_selection",
+                rubric=f"Agent 应该调用 {expected_tool} 工具",
+                min_score=3, weight=1.0,
+            ))
+
+        # 定义 mock judge（真实场景下应传入 LLM judge）
+        def mock_judge(prompt: str) -> dict:
+            return {"score": 4.0, "reasoning": "评分完成（mock）", "details": []}
+
+        scorer = ProcessRewardScorer(judge_fn=mock_judge, verifiers=contracts or None)
+        report = scorer.score_trajectory(dag, fast_mode=True)
+
+        return {
+            "total": int(report.overall_score * 2),
+            "max_score": 10,
+            "passed": not report.needs_revision,
+            "eval_engine": True,
+            "overall_score": report.overall_score,
+            "num_steps": report.num_steps,
+            "failed_steps": report.num_failed_steps,
+            "details": {
+                f"step_{s.step_index}": {
+                    "passed": not s.needs_revision,
+                    "score": s.step_score,
+                }
+                for s in report.per_step
+            },
+        }
+    except Exception as e:
+        return {
+            "total": 0,
+            "max_score": 10,
+            "passed": False,
+            "eval_engine": True,
+            "error": str(e),
+        }
