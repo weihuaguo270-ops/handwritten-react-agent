@@ -38,6 +38,8 @@ from context import manage as manage_context
 
 # Harness 集成
 from harness import Harness
+from safety import HumanInTheLoop
+from resilience import retry_call
 
 
 # ============================================================
@@ -55,7 +57,7 @@ class AgentState(TypedDict):
 # LangGraph 构建
 # ============================================================
 
-def build_agent(mcp_clients=None, harness: "Harness | None" = None):
+def build_agent(mcp_clients=None, harness: "Harness | None" = None, hitl: "HumanInTheLoop | None" = None):
     """构建 LangGraph Agent
 
     参数:
@@ -94,7 +96,10 @@ def build_agent(mcp_clients=None, harness: "Harness | None" = None):
         step_counter[0] += 1
         current_step = step_counter[0]
 
-        llm_response = llm.invoke(state["messages"])
+        # 用重试包装 LLM 调用
+        safe_llm_invoke = retry_call(llm.invoke, max_attempts=3, base_delay=1.0,
+                                      on_retry=lambda m: print(f"  {m}"))
+        llm_response = safe_llm_invoke(state["messages"])
 
         # ── Harness 记录 thought ──
         h = _get_harness(config)
@@ -147,6 +152,19 @@ def build_agent(mcp_clients=None, harness: "Harness | None" = None):
                             }
                             content = h.run_sandboxed(sandbox_call)
                         else:
+                            # ── HITL 权限检查 ──
+                            if hitl:
+                                allowed, reason = hitl.check_tool_call(tool_name, tool_args)
+                                if not allowed:
+                                    content = json.dumps({"error": f"blocked by user: {reason}"})
+                                    action_duration = _time.time() - action_start
+                                    if h:
+                                        h.record_action(
+                                            step=current_step, name=tool_name, args=tool_args,
+                                            observation=content, duration=0,
+                                        )
+                                    results.append(ToolMessage(content=content, tool_call_id=tool_call_id))
+                                    continue
                             content = str(tool_map[tool_name].invoke(tool_args))
 
                         action_duration = _time.time() - action_start
