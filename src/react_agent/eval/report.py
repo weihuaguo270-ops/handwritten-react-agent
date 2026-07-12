@@ -13,7 +13,7 @@ import os
 import time
 from typing import Optional
 
-from .scorer import score_result
+from .scorer import score_result, score_with_eval_engine
 
 REPORT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "reports")
 
@@ -36,6 +36,12 @@ def generate_report(raw_results: list, cases: list,
     for raw, case in zip(raw_results, cases):
         stdout = raw.get("stdout", "")
         trajectory = raw.get("trajectory")
+        # 优先用 eval-engine 评分（需安装 llm-eval-engine）
+    try:
+        score = score_with_eval_engine(case, trajectory)
+        if score is None:
+            raise ImportError("eval-engine not available")
+    except (ImportError, Exception):
         score = score_result(case, stdout, trajectory)
 
         entry = {
