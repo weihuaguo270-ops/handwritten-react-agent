@@ -130,11 +130,7 @@ def build_system_prompt(query: str) -> str:
     role_template = ROLE_TEMPLATES.get(role_name, "")
     prompt = BASE_SYSTEM_PROMPT + "\n\n" + role_template
 
-    # CoT 注入
-    q = query.lower()
-    if any(w in q for w in ["计算", "等于", "多少", "+", "-", "*", "/"]):
-        prompt += COT_MATH
-    elif any(w in q for w in ["为什么", "原因", "推理", "逻辑", "分析"]):
-        prompt += COT_REASONING
-
+    # CoT 注入（使用 reasoning.py 增强版）
+    from reasoning import apply_cot, auto_select_strategy
+    prompt = apply_cot(prompt, query)
     return prompt
