@@ -1,4 +1,4 @@
-""""hagent — react-agent CLI"""
+""""react — react-agent CLI"""
 from __future__ import annotations
 import os, sys, json, glob
 from contextlib import redirect_stdout
