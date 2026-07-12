@@ -34,3 +34,21 @@ jobs:
         pip install -e .
     - name: Test
       run: python test_all.py
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+    - name: Install react-agent
+      run: pip install -e .
+    - name: Clone & install llm-eval-engine
+      run: |
+        git clone --depth=1 https://github.com/weihuaguo270-ops/llm-eval-engine.git /tmp/llm-eval-engine
+        pip install -e /tmp/llm-eval-engine
+    - name: Run Agent → Eval integration
+      run: python examples/agent_to_eval.py
