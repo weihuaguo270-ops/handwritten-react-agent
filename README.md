@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/weihuaguo270-ops/react-agent/actions/workflows/test.yml/badge.svg)](https://github.com/weihuaguo270-ops/react-agent/actions/workflows/test.yml) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-**生产级 ReAct Agent 框架，双实现路线** — 手写运行时用于深入理解和完全控制，LangGraph 版用于生产部署。14 个模块覆盖 RAG、MCP 工具集成、多 Agent 编排、执行录制回放和安全护栏。
+** ReAct Agent 框架，双实现路线** — 手写运行时用于深入理解和完全控制，LangGraph 版用于生产部署。14 个模块覆盖 RAG、MCP 工具集成、多 Agent 编排、执行录制回放和安全护栏。
 
 ## 架构概览
 
@@ -167,7 +167,7 @@ python -m react_agent.dashboard.server
 
 ## 相关项目
 
-- [llm-eval-engine](https://github.com/weihuaguo270-ops/llm-eval-engine) — 生产级 LLM 评估框架
+- [llm-eval-engine](https://github.com/weihuaguo270-ops/llm-eval-engine) — LLM 评估框架
 - [transformer-attention](https://github.com/weihuaguo270-ops/transformer-attention) — NumPy/PyTorch Transformer Attention 实现
 - [trace-debugger](https://github.com/weihuaguo270-ops/trace-debugger) — Agent 执行轨迹分析工具
 
