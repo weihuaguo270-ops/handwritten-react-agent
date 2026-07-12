@@ -1,7 +1,7 @@
 """
 Dashboard — Agent 执行轨迹可视化
 
-从手写版 src/handwritten_react_agent/tools/dashboard.py 迁移。
+从手写版 src/react_agent/tools/dashboard.py 迁移。
 显示 Harness 记录的轨迹文件，支持回放和查看使用统计。
 
 用法：

@@ -1,7 +1,7 @@
 """
 安全与权限 — 为 LangGraph Agent 提供工具调用权限检查和 HITL
 
-从手写版 src/handwritten_react_agent/safety/ 迁移，适配 LangGraph 的 tool 调用方式。
+从手写版 src/react_agent/safety/ 迁移，适配 LangGraph 的 tool 调用方式。
 """
 from __future__ import annotations
 import time

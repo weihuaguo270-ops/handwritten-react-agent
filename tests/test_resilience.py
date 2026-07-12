@@ -3,7 +3,7 @@ import sys, os, time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from handwritten_react_agent.resilience import (
+from react_agent.resilience import (
     classify_error, is_retryable, ErrorCategory,
     retry, CircuitBreaker, guarded_call,
 )
@@ -149,7 +149,7 @@ def test_circuit_breaker_trips():
 
 def test_tool_guard_retry():
     """ToolGuard 重试"""
-    from handwritten_react_agent.resilience import ToolGuard
+    from react_agent.resilience import ToolGuard
     guard = ToolGuard()
     call_count = {"n": 0}
 
@@ -168,7 +168,7 @@ def test_tool_guard_retry():
 
 def test_tool_guard_timeout():
     """ToolGuard 超时保护"""
-    from handwritten_react_agent.resilience import ToolGuard
+    from react_agent.resilience import ToolGuard
     guard = ToolGuard()
 
     def slow_tool(tc):
@@ -188,7 +188,7 @@ def test_tool_guard_timeout():
 
 def test_tool_guard_dangerous_no_retry():
     """危险工具不重试"""
-    from handwritten_react_agent.resilience import ToolGuard
+    from react_agent.resilience import ToolGuard
     guard = ToolGuard()
     call_count = {"n": 0}
 
@@ -204,7 +204,7 @@ def test_tool_guard_dangerous_no_retry():
 
 def test_tool_guard_rate_limit():
     """频率限制"""
-    from handwritten_react_agent.resilience import ToolGuard
+    from react_agent.resilience import ToolGuard
     guard = ToolGuard()
     guard._max_rate = 2
 

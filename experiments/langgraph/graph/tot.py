@@ -1,7 +1,7 @@
 """
 Tree of Thoughts (ToT) — 思维树多路径推理
 
-从手写版 src/handwritten_react_agent/tot.py 迁移，适配 LangGraph 的 LLM 调用方式。
+从手写版 src/react_agent/tot.py 迁移，适配 LangGraph 的 LLM 调用方式。
 """
 from __future__ import annotations
 from typing import Optional, Callable

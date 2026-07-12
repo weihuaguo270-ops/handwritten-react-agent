@@ -27,7 +27,7 @@ def check(name, cond, detail=""):
 # 1. CoT
 # ============================================================
 print("\n【CoT 思维链】")
-from handwritten_react_agent.cot import COT, CoTStrategy, extract_reasoning
+from react_agent.cot import COT, CoTStrategy, extract_reasoning
 
 check("策略选择: 数学", COT.select("计算5只鸡和3只兔子一共多少条腿") == CoTStrategy.FEW_SHOT_MATH)
 check("策略选择: 推理", COT.select("如果下雨就不去") == CoTStrategy.FEW_SHOT_REASONING)
@@ -41,7 +41,7 @@ check("extract 推理", len(thoughts) == 1 and thoughts[0] == "第一步")
 check("extract 答案", final == "答案")
 
 # CoT 工具定义
-from handwritten_react_agent.cot import COT_TOOL_DEFINITION
+from react_agent.cot import COT_TOOL_DEFINITION
 check("工具定义存在", "switch_cot_strategy" in str(COT_TOOL_DEFINITION))
 
 
@@ -49,7 +49,7 @@ check("工具定义存在", "switch_cot_strategy" in str(COT_TOOL_DEFINITION))
 # 2. ToT
 # ============================================================
 print("\n【ToT 思维树】")
-from handwritten_react_agent.tot import ToT, ToTNode, SearchStrategy
+from react_agent.tot import ToT, ToTNode, SearchStrategy
 
 tot = ToT(beam_width=2, branch_factor=2, max_depth=2)
 
@@ -87,7 +87,7 @@ check("DFS", SearchStrategy.DFS.value == "dfs")
 # 3. Planner
 # ============================================================
 print("\n【Planner 任务规划】")
-from handwritten_react_agent.planner import Planner, Task
+from react_agent.planner import Planner, Task
 
 # 解析
 text = "task_1: 搜索今天\ntask_2: 搜索明天\ntask_3: 对比 | depends_on: 1, 2"
@@ -118,7 +118,7 @@ check("有依赖已就绪", t2.ready({"1"}) == True)
 # 4. RoleManager
 # ============================================================
 print("\n【RoleManager 角色管理】")
-from handwritten_react_agent.prompts import ROLE_MANAGER, Role
+from react_agent.prompts import ROLE_MANAGER, Role
 
 check("code_reviewer", ROLE_MANAGER.select("帮我审查代码") == Role.CODE_REVIEWER)
 check("tutor", ROLE_MANAGER.select("什么是装饰器") == Role.TUTOR)
@@ -150,7 +150,7 @@ check("包含 tutor", "tutor" in roles)
 # 5. Context Manager
 # ============================================================
 print("\n【Context 上下文管理】")
-from handwritten_react_agent.context import ContextManager, ContextStrategy, estimate_tokens, estimate_messages_tokens
+from react_agent.context import ContextManager, ContextStrategy, estimate_tokens, estimate_messages_tokens
 
 check("estimate_tokens 英文", estimate_tokens("hello world") > 0)
 check("estimate_tokens 中文", estimate_tokens("你好世界") > 0)
@@ -188,7 +188,7 @@ check("message tokens > 0", estimate_messages_tokens(short_msgs) > 0)
 # 6. Harness / 轨迹记录
 # ============================================================
 print("\n【Harness 轨迹记录】")
-from handwritten_react_agent.harness import start_trajectory, current_trajectory, finish_trajectory, Trajectory
+from react_agent.harness import start_trajectory, current_trajectory, finish_trajectory, Trajectory
 
 # 基本轨迹
 traj = Trajectory("测试问题", "test-model")
@@ -226,13 +226,13 @@ os.remove(path2)
 # 7. Sandbox
 # ============================================================
 print("\n【Sandbox 沙箱隔离】")
-from handwritten_react_agent.harness import Sandbox, SANDBOX
+from react_agent.harness import Sandbox, SANDBOX
 
 sandbox = Sandbox(strategy="off")
 check("沙箱模块存在", hasattr(sandbox, "run"))
 check("沙箱默认关闭", SANDBOX.strategy == "off" or SANDBOX.strategy == "off")
-check("_sandbox_runner 存在", os.path.exists(os.path.join(os.path.dirname(__file__), "src/handwritten_react_agent/harness/_sandbox_runner.py")))
-SANDBOX_TOOL_DEFINITION = __import__("handwritten_react_agent.harness.sandbox", fromlist=["SANDBOX_TOOL_DEFINITION"]).SANDBOX_TOOL_DEFINITION
+check("_sandbox_runner 存在", os.path.exists(os.path.join(os.path.dirname(__file__), "src/react_agent/harness/_sandbox_runner.py")))
+SANDBOX_TOOL_DEFINITION = __import__("react_agent.harness.sandbox", fromlist=["SANDBOX_TOOL_DEFINITION"]).SANDBOX_TOOL_DEFINITION
 check("SANDBOX_TOOL_DEFINITION 存在", "toggle_sandbox" in str(SANDBOX_TOOL_DEFINITION))
 
 
@@ -240,9 +240,9 @@ check("SANDBOX_TOOL_DEFINITION 存在", "toggle_sandbox" in str(SANDBOX_TOOL_DEF
 # 8. 工具模块（tools/）
 # ============================================================
 print("\n【工具模块 tools/】")
-from handwritten_react_agent.tools.calculator import calculator
-from handwritten_react_agent.tools.summarize import summarize
-from handwritten_react_agent.tools.get_time import get_time
+from react_agent.tools.calculator import calculator
+from react_agent.tools.summarize import summarize
+from react_agent.tools.get_time import get_time
 
 check("calculator 1+2", calculator("1+2") == "3")
 check("calculator 小数", calculator("3.5*2") == "7.0")
@@ -254,8 +254,8 @@ check("summarize 短文本", "过短" in summarize("短"))
 check("summarize 正常", len(summarize("句子一。句子二。句子三。句子四。句子五。", 3)) > 0)
 
 # 工具定义存在
-from handwritten_react_agent.tools.get_time import TOOL_DEFINITION as TD_GET
-from handwritten_react_agent.tools.calculator import TOOL_DEFINITION as TD_CALC
+from react_agent.tools.get_time import TOOL_DEFINITION as TD_GET
+from react_agent.tools.calculator import TOOL_DEFINITION as TD_CALC
 check("工具定义 get_time 正确", TD_GET["function"]["name"] == "get_time")
 check("工具定义 calculator 正确", TD_CALC["function"]["name"] == "calculator")
 
@@ -264,7 +264,7 @@ check("工具定义 calculator 正确", TD_CALC["function"]["name"] == "calculat
 # 9. 工具注册完整性（从 tools 直接导入，不依赖 react_loop.py）
 # ============================================================
 print("\n【工具注册完整性】")
-from handwritten_react_agent.tools import TOOL_REGISTRY as TR, TOOL_DEFINITIONS as TDS
+from react_agent.tools import TOOL_REGISTRY as TR, TOOL_DEFINITIONS as TDS
 
 expected_tools = [
     "get_time", "calculator", "web_search", "fetch_page", "summarize",
@@ -289,8 +289,8 @@ for td in TDS:
 # 10. Memory（语义记忆）
 # ============================================================
 print("\n【Memory 记忆系统】")
-import handwritten_react_agent.memory as mem_mod
-from handwritten_react_agent.memory import Memory
+import react_agent.memory as mem_mod
+from react_agent.memory import Memory
 
 m = Memory()
 m.facts = []
@@ -314,7 +314,7 @@ check("remove 后事实减少", len(m.facts) == 0)
 # 11. Orchestrator
 # ============================================================
 print("\n【Orchestrator 多 Agent】")
-from handwritten_react_agent.orchestrator import Planner, Task
+from react_agent.orchestrator import Planner, Task
 import re as _re
 
 # 测试 Planner 的模板匹配正则（不依赖 LLM）
@@ -345,7 +345,7 @@ check("打招呼无模板", _match_template("你好") is None)
 import subprocess
 print("\n【Replay 重放】")
 # 先建一个轨迹文件
-from handwritten_react_agent.harness import start_trajectory, finish_trajectory
+from react_agent.harness import start_trajectory, finish_trajectory
 t = start_trajectory("重放测试", "m1")
 t.add_thought(1, "测试")
 path = finish_trajectory("ok")

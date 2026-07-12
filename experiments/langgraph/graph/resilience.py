@@ -1,7 +1,7 @@
 """
 容错与重试 — 为 LangGraph Agent 提供 LLM 调用重试和错误分类
 
-从手写版 src/handwritten_react_agent/resilience.py 迁移核心逻辑，适配 LangChain 调用方式。
+从手写版 src/react_agent/resilience.py 迁移核心逻辑，适配 LangChain 调用方式。
 """
 from __future__ import annotations
 import time

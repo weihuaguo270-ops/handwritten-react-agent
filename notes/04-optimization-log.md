@@ -22,9 +22,9 @@
 
 ### 改动文件
 
-- `src/handwritten_react_agent/memory.py`
-- `src/handwritten_react_agent/rag.py`
-- `src/handwritten_react_agent/react_loop.py`
+- `src/react_agent/memory.py`
+- `src/react_agent/rag.py`
+- `src/react_agent/react_loop.py`
 
 ### 效果
 
@@ -37,14 +37,14 @@
 ## 优化 2：test_all.py 路径修复
 
 ### 问题
-项目结构改为 monorepo（src/handwritten_react_agent/ + experiments/）后，`test_all.py` 中的 import 路径未同步更新：
+项目结构改为 monorepo（src/react_agent/ + experiments/）后，`test_all.py` 中的 import 路径未同步更新：
 - `from tools.calculator import` → `ModuleNotFoundError`
 - `from memory import` → `ModuleNotFoundError`
 - `from harness.sandbox import` → `ModuleNotFoundError`
 - `Sandbox(enabled=False)` → 参数名已改为 `strategy`
 
 ### 修复
-统一替换为 `from handwritten_react_agent.xxx import` 格式。
+统一替换为 `from react_agent.xxx import` 格式。
 
 ### 结果
 测试从约 15 项失败减少到 3 项（沙箱和 replay 相关，不阻塞功能使用）。

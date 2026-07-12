@@ -1,7 +1,7 @@
 """
 评测工具 — Agent 输出质量评估
 
-从手写版 src/handwritten_react_agent/eval/ 迁移核心功能。
+从手写版 src/react_agent/eval/ 迁移核心功能。
 支持 4 维评分：正确性、完整性、效率、安全性。
 """
 from __future__ import annotations

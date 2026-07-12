@@ -81,7 +81,7 @@
 | 操作 | `python react_loop.py "现在几点了"` |
 | 输入 | react_loop.py 中使用 `COT.inject()`，但 `from cot import COT` 从未添加 |
 | 错误结果 | `NameError: name 'COT' is not defined` |
-| 修复结果 | 在 import 段添加 `from handwritten_react_agent.cot import COT` |
+| 修复结果 | 在 import 段添加 `from react_agent.cot import COT` |
 
 ## Bug 10：MODEL 未定义
 

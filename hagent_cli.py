@@ -23,7 +23,7 @@ _history: list[dict] = []
 
 with redirect_stdout(StringIO()):
     try:
-        import src.handwritten_react_agent.react_loop
+        import src.react_agent.react_loop
     except Exception:
         pass
 
@@ -33,7 +33,7 @@ def _import(mod: str, name: str):
 
 
 def _recent_traj() -> str:
-    for d in [os.path.join(_base, "src", "handwritten_react_agent", "trajectories"),
+    for d in [os.path.join(_base, "src", "react_agent", "trajectories"),
               os.path.join(_base, "trajectories")]:
         if os.path.exists(d):
             fs = sorted(glob.glob(os.path.join(d, "*.json")), reverse=True)
@@ -74,16 +74,16 @@ class ToolMonitor:
 
 def _run(q: str) -> str:
     try:
-        task_type = _import("handwritten_react_agent.intent.classifier", "IntentClassifier")().classify(q)
+        task_type = _import("react_agent.intent.classifier", "IntentClassifier")().classify(q)
     except Exception:
         task_type = ""
-    HITL = _import("handwritten_react_agent.safety.human_in_the_loop", "HumanInTheLoop")
+    HITL = _import("react_agent.safety.human_in_the_loop", "HumanInTheLoop")
     PW = _import("integration.agent_wrapper", "PermissionWrapper")
     hitl = HITL(ask_fn=_hitl_ask)
     perm = PW(hitl=hitl)
     m = ToolMonitor()
     # CLI 模式：注入简洁角色（覆盖 prompt 中默认的客套风格）
-    import src.handwritten_react_agent.react_loop as rl
+    import src.react_agent.react_loop as rl
     rl.execute_tool_call = m.wrap(perm.wrap(rl.execute_tool_call))
 
     # 在查询中注入风格指令，让 Agent 回答简洁直接
@@ -127,7 +127,7 @@ def _handle(c: str) -> bool:
     elif x == "/model" and len(p) > 1:
         os.environ["LLM_MODEL"] = p[1]
         # 清除 LLM 模块缓存，下次调用读新模型
-        import src.handwritten_react_agent.llm as llm_mod
+        import src.react_agent.llm as llm_mod
         llm_mod._CONFIG = None
         llm_mod.LLM_DEFAULT = None
         _console.print(f"model: {p[1]}")
@@ -171,7 +171,7 @@ def shell(provider: str = ""):
         # Header — 显示实际模型名而非 provider 标签
         cur = "unknown"
         try:
-            from src.handwritten_react_agent.llm import LLM
+            from src.react_agent.llm import LLM
             cur = LLM().model
         except Exception:
             cur = os.environ.get("LLM_PROVIDER", "default")

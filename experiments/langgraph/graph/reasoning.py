@@ -1,7 +1,7 @@
 """
 推理增强策略 — Chain of Thought / 结构化推理
 
-从手写版 src/handwritten_react_agent/cot.py 迁移，适配 LangGraph 的 prompt 构建方式。
+从手写版 src/react_agent/cot.py 迁移，适配 LangGraph 的 prompt 构建方式。
 """
 from enum import Enum
 from typing import Optional
