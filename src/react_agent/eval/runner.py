@@ -1,15 +1,7 @@
 """runner — 批量执行 Agent + 集成 Recorder 记录轨迹
 
-核心逻辑：
-    对每一条测试用例，调用 Agent 执行，同时记录轨迹到 trajectories/。
-    不直接调 Agent 的循环逻辑——而是复用已有的 subprocess 调用方式（通过 react_loop.py），
-    确保 runner 和实际使用环境一致（不是模拟调用）。
-
-数据流：
-    for each test_case:
-        subprocess(react_loop.py "<question>")  →  stdout + trajectory file
-        scorer.score(stdout, trajectory, test_case)  →  Result
-    report.aggregate(results)  →  eval/reports/eval_xxx.json
+对每一条测试用例，通过 subprocess 调用 react_loop.py，
+并支持 consistency_runs>1 时的重复执行。
 """
 
 import subprocess
@@ -20,43 +12,46 @@ import json
 import glob
 from typing import Optional
 
-# 引用 repo 根目录
+# src/react_agent/ 与项目根（含 llm_config.json / .env）
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "..", ".."))
 REACT_LOOP = os.path.join(BASE_DIR, "react_loop.py")
 TRAJECTORY_DIR = os.path.join(BASE_DIR, "trajectories")
 
 
 def run_single_case(question: str, timeout: int = 60,
-                    provider: Optional[str] = None) -> tuple[str, Optional[dict]]:
+                    provider: Optional[str] = None) -> tuple:
     """执行单条测试用例
 
-    通过 subprocess 调用 react_loop.py，捕获输出。
-    执行完成后从 trajectories/ 中找到最新生成的轨迹文件。
-
-    参数:
-        question: 用户问题
-        timeout:  超时秒数
-        provider: 指定 LLM provider（None=使用默认）
-
     返回:
-        (stdout, trajectory_dict_or_None)
+        (stdout, trajectory_dict_or_None, exit_code, duration)
     """
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     if provider:
         env["LLM_PROVIDER"] = provider
+    # 保证可 import react_agent，并让 llm 能找到项目根配置
+    src_dir = os.path.dirname(BASE_DIR)
+    env["PYTHONPATH"] = os.pathsep.join(
+        [src_dir, env.get("PYTHONPATH", "")]
+    ).rstrip(os.pathsep)
+    # 评测子进程关闭沙箱预热，避免每条用例多一次冷启动
+    env["REACT_AGENT_SANDBOX_PREWARM"] = "0"
 
-    # 记录运行前的轨迹文件列表，用于识别本次运行新生成的
     before_files = _list_traj_files()
 
     start_time = time.time()
     try:
+        # cwd 用项目根，便于加载 llm_config.json / .env
         result = subprocess.run(
             [sys.executable, REACT_LOOP, question],
             capture_output=True, text=True, timeout=timeout,
-            cwd=BASE_DIR,
+            encoding="utf-8", errors="replace",
+            cwd=PROJECT_ROOT if os.path.isdir(PROJECT_ROOT) else BASE_DIR,
             env=env,
         )
         stdout = result.stdout.strip()
+        if result.stderr and not stdout:
+            stdout = result.stderr.strip()
         exit_code = result.returncode
     except subprocess.TimeoutExpired:
         stdout = f"[Eval] 超时 ({timeout}s)"
@@ -67,9 +62,8 @@ def run_single_case(question: str, timeout: int = 60,
 
     duration = round(time.time() - start_time, 2)
 
-    # 找到本次运行新生成的轨迹文件
     after_files = _list_traj_files()
-    new_files = [f for f in after_files if f not in before_files]
+    new_files = sorted(f for f in after_files if f not in before_files)
     trajectory = None
     if new_files:
         latest_file = new_files[-1]
@@ -83,7 +77,6 @@ def run_single_case(question: str, timeout: int = 60,
 
 
 def _list_traj_files() -> set:
-    """返回 trajectories/ 下所有 JSON 文件路径的 set"""
     if not os.path.exists(TRAJECTORY_DIR):
         return set()
     return set(glob.glob(os.path.join(TRAJECTORY_DIR, "traj_*.json")))
@@ -93,14 +86,8 @@ def run_batch(cases: list, provider: Optional[str] = None,
               progress_callback=None) -> list:
     """批量运行测试用例
 
-    参数:
-        cases: TestCase 列表
-        provider: LLM provider
-        progress_callback: 可选回调函数，用于报告进度
-            def callback(index, total, case_id, status, result_or_error)
-
-    返回:
-        list[dict] — 每条用例一个结果字典
+    对 consistency_runs > 1 的用例会重复执行，结果写入
+    result["run_results"]，供 capability_scorer 计算一致率。
     """
     results = []
     total = len(cases)
@@ -110,23 +97,59 @@ def run_batch(cases: list, provider: Optional[str] = None,
         if progress_callback:
             progress_callback(i + 1, total, case_id, "running", None)
 
-        timeout = case.timeout
-        stdout, trajectory, exit_code, duration = run_single_case(
-            case.question, timeout=timeout, provider=provider,
-        )
+        timeout = getattr(case, "timeout", 60)
+        runs = max(1, int(getattr(case, "consistency_runs", 1) or 1))
+        # 仅 consistency capability 强制多跑；其它 capability 若设了 runs 也尊重
+        if getattr(case, "capability", None) == "consistency":
+            runs = max(runs, 2)
 
+        run_results = []
+        total_duration = 0.0
+        last_exit = 0
+        timed_out = False
+
+        for r_i in range(runs):
+            stdout, trajectory, exit_code, duration = run_single_case(
+                case.question, timeout=timeout, provider=provider,
+            )
+            total_duration += duration
+            last_exit = exit_code
+            if exit_code == -1:
+                timed_out = True
+            run_results.append({
+                "stdout": stdout,
+                "trajectory": trajectory,
+                "exit_code": exit_code,
+                "duration_seconds": duration,
+            })
+            if progress_callback and runs > 1:
+                progress_callback(
+                    i + 1, total, f"{case_id}#{r_i+1}/{runs}",
+                    "timeout" if exit_code == -1 else ("error" if exit_code != 0 else "done"),
+                    {"duration_seconds": duration},
+                )
+
+        primary = run_results[-1]
         result = {
             "case_id": case_id,
             "question": case.question,
-            "stdout": stdout,
-            "trajectory": trajectory,
-            "exit_code": exit_code,
-            "duration_seconds": duration,
-            "timed_out": exit_code == -1,
+            "stdout": primary["stdout"],
+            "trajectory": primary["trajectory"],
+            "exit_code": last_exit,
+            "duration_seconds": round(total_duration, 2),
+            "timed_out": timed_out,
+            "runs": runs,
         }
+        if runs > 1:
+            result["run_results"] = run_results
 
         if progress_callback:
-            status = "timeout" if exit_code == -1 else ("error" if exit_code != 0 else "done")
+            if timed_out:
+                status = "timeout"
+            elif last_exit == 0:
+                status = "done"
+            else:
+                status = "error"
             progress_callback(i + 1, total, case_id, status, result)
 
         results.append(result)

@@ -8,6 +8,8 @@ rag_index.json
 trajectories/
 _sandbox_runner.py
 handwritten_react_agent.egg-info/
+*.egg-info/
+src/**/*.egg-info/
 
 # Local data files
 trajectories/
@@ -15,3 +17,6 @@ rag_index.json
 memory.json
 llm_config.json
 .env
+
+# Local eval run artifacts (keep committed sample reports only if already tracked)
+src/react_agent/eval/reports/eval_20260713_*.json
