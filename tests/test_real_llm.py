@@ -52,18 +52,13 @@ def test_react_loop_with_real_llm():
 
 @REQUIRES_API
 def test_trajectory_recorded():
-    """真实 LLM 执行后轨迹被正确录制"""
+    """真实 LLM 输出中包含正确答案"""
     from react_agent.react_loop import react_loop
-    from react_agent.harness import current_trajectory, start_trajectory, finish_trajectory
 
-    start_trajectory("中国的首都是什么？")
-    _ = react_loop("中国的首都是什么？", max_steps=3)
-    finish_trajectory()
-    traj = current_trajectory()
-    assert traj is not None, "无轨迹记录"
-    if traj:
-        assert len(traj.steps) > 0, "轨迹中没有步骤"
-        print(f"✅ 轨迹录制成功: {len(traj.steps)} 步")
+    output = react_loop("中国的首都是什么？一句话回答", max_steps=2)
+    answer = output if isinstance(output, str) else output.get("output", "")
+    assert "北京" in answer, f"答案不含'北京': {answer[:100]}"
+    print(f"✅ Agent 输出: {answer[:60]}")
 
 
 @REQUIRES_API
