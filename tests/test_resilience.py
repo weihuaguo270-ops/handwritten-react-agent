@@ -168,21 +168,20 @@ def test_tool_guard_retry():
 
 def test_tool_guard_timeout():
     """ToolGuard 超时保护"""
+    import json
     from react_agent.resilience import ToolGuard
     guard = ToolGuard()
+    # 将该工具超时压到 1 秒，避免单测真睡 30s+
+    guard._TOOL_TIMEOUTS = {**ToolGuard._TOOL_TIMEOUTS, "execute_python": 1}
 
     def slow_tool(tc):
-        import time
-        time.sleep(5)
+        time.sleep(3)
         return "ok"
 
     wrapped = guard.wrap(slow_tool)
-    # get_time 默认超时 60s，测试用特殊 timeout 检查
-    import json
     result = wrapped({"function": {"name": "execute_python", "arguments": "{}"}})
-    # 应该超时后尝试重试（1次），最后返回错误
     parsed = json.loads(result)
-    assert "超时" in parsed.get("error", "")
+    assert "超时" in parsed.get("error", ""), f"应超时，实际: {result}"
     print("  ✅ ToolGuard 超时保护正确")
 
 
@@ -235,6 +234,7 @@ if __name__ == "__main__":
     test_guarded_call_fallback()
     test_circuit_breaker_trips()
     test_tool_guard_retry()
+    test_tool_guard_timeout()
     test_tool_guard_dangerous_no_retry()
     test_tool_guard_rate_limit()
     print(f"\n  ✅ 全部 13 个测试通过")

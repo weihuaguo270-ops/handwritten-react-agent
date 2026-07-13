@@ -227,13 +227,33 @@ os.remove(path2)
 # ============================================================
 print("\n【Sandbox 沙箱隔离】")
 from react_agent.harness import Sandbox, SANDBOX
+from react_agent.harness.sandbox import SANDBOX_TOOL_DEFINITION
 
-sandbox = Sandbox(strategy="off")
+sandbox = Sandbox(strategy="off", prewarm=False)
 check("沙箱模块存在", hasattr(sandbox, "run"))
-check("沙箱默认关闭", SANDBOX.strategy == "off" or SANDBOX.strategy == "off")
-check("_sandbox_runner 存在", os.path.exists(os.path.join(os.path.dirname(__file__), "src/react_agent/harness/_sandbox_runner.py")))
-SANDBOX_TOOL_DEFINITION = __import__("react_agent.harness.sandbox", fromlist=["SANDBOX_TOOL_DEFINITION"]).SANDBOX_TOOL_DEFINITION
+check("全局默认策略为 auto", SANDBOX.strategy == "auto")
+check("_sandbox_runner 存在", os.path.exists(
+    os.path.join(os.path.dirname(__file__), "src/react_agent/harness/_sandbox_runner.py")))
 check("SANDBOX_TOOL_DEFINITION 存在", "toggle_sandbox" in str(SANDBOX_TOOL_DEFINITION))
+
+# safe 工具在 auto 下应跳过子进程
+sb_auto = Sandbox(strategy="auto", prewarm=False, timeout=15)
+calc_skip = sb_auto.run({
+    "function": {"name": "calculator", "arguments": '{"expression": "1+1"}'}
+})
+check("auto 下 calculator 跳过沙箱", calc_skip == "__SANDBOX_DISABLED__")
+
+# on 模式走子进程执行轻量工具（验证 runner 无递归/无 strip 崩）
+sb_on = Sandbox(strategy="on", prewarm=False, timeout=20)
+calc_box = sb_on.run({
+    "function": {"name": "calculator", "arguments": '{"expression": "2+3"}'}
+})
+check("on 下 calculator 沙箱返回 5",
+      calc_box.strip() == "5",
+      detail=repr(calc_box[:120]))
+check("沙箱返回不含异常标记",
+      not calc_box.startswith("[沙箱]"),
+      detail=repr(calc_box[:120]))
 
 
 # ============================================================
@@ -286,28 +306,49 @@ for td in TDS:
 
 
 # ============================================================
-# 10. Memory（语义记忆）
+# 10. Memory（语义记忆）— 用假模型，避免加载 BGE/torch 拖垮机器
 # ============================================================
 print("\n【Memory 记忆系统】")
-import react_agent.memory as mem_mod
+import tempfile
+import numpy as np
 from react_agent.memory import Memory
 
-m = Memory()
+
+class _FakeEmbedder:
+    """确定性假向量，仅供单测，不加载 sentence-transformers。"""
+
+    def encode(self, text):
+        vec = np.zeros(16, dtype=float)
+        for i, ch in enumerate(str(text)):
+            vec[i % 16] += (ord(ch) % 13) + 1
+        n = np.linalg.norm(vec)
+        return vec / n if n else vec
+
+
+_mem_path = tempfile.mktemp(suffix="_memory_test.json")
+m = Memory(save_path=_mem_path)
+m._model = _FakeEmbedder()
 m.facts = []
+m.vecs = []
+m.access_count = []
+m.last_access = []
 check("空记忆无检索", len(m.query("test")) == 0)
 
-# 删除测试（先清空再测试）
 m.clear()
+m._model = _FakeEmbedder()  # clear 后仍用假模型
 m.add("小明是学生")
 check("添加后事实数>0", len(m.facts) > 0)
 
 found = m.query("小明")
 check("查询小明有结果", len(found) > 0)
 
-# remove 测试
 removed = m.remove("小明")
 check("remove 返回 True", removed)
 check("remove 后事实减少", len(m.facts) == 0)
+try:
+    os.remove(_mem_path)
+except OSError:
+    pass
 
 
 # ============================================================
