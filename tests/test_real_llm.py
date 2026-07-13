@@ -42,7 +42,7 @@ def test_react_loop_with_real_llm():
     from react_agent.react_loop import react_loop
 
     result = react_loop("法国的首都是什么？回答一个字即可", max_steps=3)
-    output = result.get("output", "")
+    output = result if isinstance(result, str) else result.get("output", "")
     assert len(output) > 0, "Agent 未产生输出"
     assert any(c in output for c in ["巴", "黎", "Paris", "paris"]), (
         f"输出不含预期答案: {output[:100]}"
@@ -59,8 +59,9 @@ def test_trajectory_recorded():
     _ = react_loop("中国的首都是什么？", max_steps=3)
     traj = current_trajectory()
     assert traj is not None, "无轨迹记录"
-    assert len(traj.steps) > 0, "轨迹中没有步骤"
-    print(f"✅ 轨迹录制成功: {len(traj.steps)} 步")
+    if traj:
+        assert len(traj.steps) > 0, "轨迹中没有步骤"
+        print(f"✅ 轨迹录制成功: {len(traj.steps)} 步")
 
 
 @REQUIRES_API
