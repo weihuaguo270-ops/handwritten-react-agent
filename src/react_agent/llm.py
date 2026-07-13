@@ -31,12 +31,56 @@ from typing import Optional
 from urllib import request as req
 from urllib.error import URLError
 
-# 优先找包目录下的 llm_config.json，找不到则找当前工作目录的
+# 查找 llm_config.json：包目录 → 项目根 → 当前工作目录
 _pkg_dir = os.path.dirname(os.path.abspath(__file__))
-_cwd_config = os.path.join(os.getcwd(), "llm_config.json")
-CONFIG_FILE = os.path.join(_pkg_dir, "llm_config.json")
-if not os.path.exists(CONFIG_FILE) and os.path.exists(_cwd_config):
-    CONFIG_FILE = _cwd_config
+_project_root = os.path.abspath(os.path.join(_pkg_dir, "..", ".."))
+_candidates = [
+    os.path.join(_pkg_dir, "llm_config.json"),
+    os.path.join(_project_root, "llm_config.json"),
+    os.path.join(os.getcwd(), "llm_config.json"),
+]
+CONFIG_FILE = next((p for p in _candidates if os.path.exists(p)), _candidates[0])
+
+
+def _load_dotenv(override: bool = True) -> Optional[str]:
+    """加载项目根目录 / 当前目录的 .env 到 os.environ。
+
+    默认 override=True：让项目内 .env 覆盖系统/用户级环境变量。
+    避免 Windows 用户环境里残留的旧 API Key 盖住 .env 中的有效 Key。
+    """
+    candidates = [
+        os.path.join(os.getcwd(), ".env"),
+        os.path.join(_project_root, ".env"),
+        os.path.join(os.path.dirname(CONFIG_FILE), ".env"),
+    ]
+    seen = set()
+    for path in candidates:
+        path = os.path.abspath(path)
+        if path in seen or not os.path.isfile(path):
+            continue
+        seen.add(path)
+        with open(path, encoding="utf-8-sig") as f:
+            for line in f:
+                s = line.strip()
+                if not s or s.startswith("#") or "=" not in s:
+                    continue
+                key, _, val = s.partition("=")
+                key = key.strip()
+                val = val.strip()
+                if (val.startswith('"') and val.endswith('"')) or (
+                    val.startswith("'") and val.endswith("'")
+                ):
+                    val = val[1:-1]
+                if not key:
+                    continue
+                if override or key not in os.environ:
+                    os.environ[key] = val
+        return path
+    return None
+
+
+# 在解析 provider / 创建默认 LLM 之前加载 .env
+_load_dotenv(override=True)
 
 # 全局缓存，避免多次解析
 _CONFIG: Optional[dict] = None

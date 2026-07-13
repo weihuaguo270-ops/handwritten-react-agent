@@ -24,6 +24,21 @@ import textwrap
 # _sandbox_runner.py 的路径（和 sandbox.py 同目录）
 _RUNNER_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_sandbox_runner.py")
 
+# 子进程环境变量：阻止 runner 内再次创建/预热沙箱（避免进程递归膨胀）
+_SANDBOX_CHILD_ENV = "REACT_AGENT_SANDBOX_CHILD"
+
+
+def _in_sandbox_child() -> bool:
+    return os.environ.get(_SANDBOX_CHILD_ENV) == "1"
+
+
+def _child_env() -> dict:
+    return {
+        **os.environ,
+        "PYTHONIOENCODING": "utf-8",
+        _SANDBOX_CHILD_ENV: "1",
+    }
+
 
 # ============================================================
 # 工具风险等级标签（按类别判断）
@@ -90,16 +105,21 @@ def should_sandbox_by_risk(tool_name: str, strategy: str) -> bool:
 # ============================================================
 
 def _ensure_runner():
-    """确保子进程运行脚本存在"""
-    if not os.path.exists(_RUNNER_PATH):
-        runner_code = textwrap.dedent("""\
-        import sys
+    """确保子进程运行脚本存在（与仓库内 _sandbox_runner.py 保持一致）"""
+    if os.path.exists(_RUNNER_PATH):
+        return
+    runner_code = textwrap.dedent("""\
+        import io
         import json
         import os
+        import sys
+        from contextlib import redirect_stderr, redirect_stdout
 
-        # 把项目目录加入路径
+        os.environ["REACT_AGENT_SANDBOX_CHILD"] = "1"
 
-        from react_agent.react_loop import TOOL_REGISTRY
+        _import_buf = io.StringIO()
+        with redirect_stdout(_import_buf), redirect_stderr(_import_buf):
+            from react_agent.tools import TOOL_REGISTRY
 
         if len(sys.argv) < 2:
             print("缺少工具调用参数")
@@ -128,8 +148,8 @@ def _ensure_runner():
             print(f"工具执行错误: {e}")
             sys.exit(1)
         """)
-        with open(_RUNNER_PATH, "w", encoding="utf-8") as f:
-            f.write(runner_code)
+    with open(_RUNNER_PATH, "w", encoding="utf-8") as f:
+        f.write(runner_code)
 
 
 # ============================================================
@@ -157,6 +177,12 @@ class Sandbox:
     def __init__(self, timeout: int = 30, strategy: str = "auto", prewarm: bool = True):
         if strategy not in VALID_STRATEGIES:
             raise ValueError(f"未知沙箱策略: {strategy}，可选: {VALID_STRATEGIES}")
+        # 沙箱子进程内禁止再开沙箱/预热，否则会递归拉起进程把系统拖死
+        if _in_sandbox_child():
+            strategy = "off"
+            prewarm = False
+        if os.environ.get("REACT_AGENT_SANDBOX_PREWARM", "1") == "0":
+            prewarm = False
         self.timeout = timeout
         self.strategy = strategy
         self._prewarmed = False
@@ -166,6 +192,8 @@ class Sandbox:
 
     def _prewarm(self):
         """预热子进程：启动一次轻量计算，让 Python 缓存字节码和模块导入"""
+        if _in_sandbox_child():
+            return
         try:
             warmup_payload = json.dumps({
                 "function": {"name": "get_time", "arguments": "{}"}
@@ -173,8 +201,9 @@ class Sandbox:
             subprocess.run(
                 [sys.executable, _RUNNER_PATH, warmup_payload],
                 capture_output=True, text=True, timeout=10,
+                encoding="utf-8", errors="replace",
                 cwd=os.path.dirname(os.path.abspath(__file__)),
-                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+                env=_child_env(),
             )
             self._prewarmed = True
         except Exception:
@@ -224,19 +253,18 @@ class Sandbox:
                 [sys.executable, _RUNNER_PATH, payload],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=self.timeout,
                 cwd=project_dir,
-                env={
-                    **os.environ,
-                    "PYTHONIOENCODING": "utf-8",
-                },
+                env=_child_env(),
             )
 
             if result.returncode != 0:
-                stderr = result.stderr.strip()[:200]
+                stderr = (result.stderr or "").strip()[:200]
                 return f"[沙箱] 工具 '{tool_name}' 执行失败: {stderr}"
 
-            output = result.stdout.strip()
+            output = (result.stdout or "").strip()
             return output if output else f"(工具 '{tool_name}' 无返回)"
 
         except subprocess.TimeoutExpired:

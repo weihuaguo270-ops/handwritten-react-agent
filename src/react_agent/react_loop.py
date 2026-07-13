@@ -267,6 +267,14 @@ def react_loop(user_query, max_steps=10, tool_defs=None):
                 print(f"  [上下文] {CONTEXT.last_action}")
 
     print(f"\n(达到最大步骤 {max_steps}，停止)")
+    # 最后一步若只有 tool_calls、content 为空，回退到此前有文本的 assistant 思考
+    if not (last_content or "").strip():
+        for m in reversed(messages):
+            if m.get("role") == "assistant":
+                text = (m.get("content") or "").strip()
+                if text:
+                    last_content = text
+                    break
     if last_content.strip():
         print(f">>> 最终答案: {last_content.strip()}")
     _finish_with_save(last_content.strip() if last_content.strip() else "")

@@ -5,7 +5,8 @@ from contextlib import redirect_stdout
 from io import StringIO
 
 _base = os.path.dirname(os.path.abspath(__file__))
-os.chdir(_base); os.environ.pop("DEEPSEEK_API_KEY", None)
+os.chdir(_base)
+# 勿 pop DEEPSEEK_API_KEY：由 llm._load_dotenv 从项目 .env 加载/覆盖
 for p in [_base, os.path.join(_base, "src"),
           os.path.join(_base, "experiments", "eval-engine")]:
     sys.path.insert(0, p)
