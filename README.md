@@ -88,17 +88,13 @@ react_agent/
 
 ### 多 Provider LLM 支持
 
-环境变量切换，无需改代码：
+优先读取项目根目录 `.env` / `llm_config.json`（`.env` 会覆盖系统里残留的旧 API Key），也可用环境变量切换 provider：
 
 ```bash
-export LLM_PROVIDER=deepseek
-export LLM_PROVIDER=openai
-export LLM_PROVIDER=anthropic
+export LLM_PROVIDER=deepseek   # 或 openai / anthropic
 ```
 
-`llm_config.json` 中配置各 provider 的 API key、base URL 和模型名。
-
-### 权限安全系统
+### 权限与沙箱
 
 四级权限控制工具调用：
 
@@ -108,6 +104,8 @@ export LLM_PROVIDER=anthropic
 | NOTIFY | 记录 + 继续 | fetch_page（外部域名） |
 | CONFIRM | 询问用户 | write_file、execute_python |
 | DENY | 拦截 | rm -rf、敏感路径 |
+
+`harness/sandbox.py` 支持 `off` / `auto` / `on`；子进程内禁止再次预热沙箱，避免递归拉起进程。
 
 ### 执行轨迹录制
 
@@ -191,17 +189,32 @@ python -m react_agent.eval --list
 
 报告保存在 `src/react_agent/eval/reports/`，`summary` 含 `by_capability` 与顶层 `accuracy_rate` / `tool_selection_f1` / `reasoning_rate` / `consistency_rate` / `hallucination_rate`。
 
+与 [llm-eval-engine](https://github.com/weihuaguo270-ops/llm-eval-engine) 的 Process Reward 打通示例见 `examples/agent_to_eval.py`（CI 会校验导入路径；有 API Key 时可走真实 Judge）。
+
+## 测试
+
+```bash
+# 离线单测（含 capability_scorer、resilience）
+pytest tests/ -q
+
+# 全模块脚本测试（不依赖 LLM）
+python test_all.py
+
+# 真实 LLM 集成测试（无 Key 时自动 skip）
+pytest tests/test_real_llm.py -v
+```
+
 ## 环境要求
 
 - Python 3.10+
-- LLM API key
-- LangChain + LangGraph（experiments/langgraph/ 需要，可选）
+- LLM API key（运行 Agent / 真实评测时需要）
+- LangChain + LangGraph（仅 `experiments/langgraph/` 需要，可选）
 
 ## 相关项目
 
-- [llm-eval-engine](https://github.com/weihuaguo270-ops/llm-eval-engine) — LLM 评估框架
-- [transformer-attention](https://github.com/weihuaguo270-ops/transformer-attention) — NumPy/PyTorch Transformer Attention 实现
-- [trace-debugger](https://github.com/weihuaguo270-ops/trace-debugger) — Agent 执行轨迹分析工具
+- [llm-eval-engine](https://github.com/weihuaguo270-ops/llm-eval-engine) — LLM 评估实验框架（Process Reward）
+- [transformer-attention](https://github.com/weihuaguo270-ops/transformer-attention) — Attention 教学实现
+- [trace-debugger](https://github.com/weihuaguo270-ops/trace-debugger) — 轨迹分析小工具
 
 ## License
 

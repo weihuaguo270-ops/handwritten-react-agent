@@ -1,15 +1,15 @@
 # Changelog
 
-## 0.1.0 (2026-07-12)
-
-### Changed
-- 项目从 handwritten-react-agent 更名为 react-agent
-- 包名重构: handwritten_react_agent → react_agent
-- CLI 更名: hagent → react
-- 移除 experiments/eval-engine/（拆分为独立仓库 llm-eval-engine）
-- 移除 notes/ 目录
-- README 重写为中文专业版
+## 0.1.0 (2026-07-13)
 
 ### Added
-- GitHub Actions CI 工作流
-- CI Badge 到 README
+- Capability 评测：`capability_scorer` + `capability_dataset.json`（准确率/工具/推理/一致性/幻觉）
+- `python -m react_agent` / `python -m react_agent.eval` 入口
+- 真实 LLM 集成测试（无 Key 时 skip）与 Agent→Eval 对接示例
+
+### Changed
+- README 降调为学习实现；沙箱防递归；`.env` 优先加载 API Key
+- 项目从 handwritten-react-agent 更名为 react-agent（历史）
+
+### Infrastructure
+- GitHub Actions CI（lint + test + eval-engine 集成校验）
