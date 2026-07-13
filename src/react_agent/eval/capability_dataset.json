@@ -210,5 +210,75 @@
     "timeout": 120,
     "tag": "hallucination",
     "description": "幻觉：不确定时不编造"
+  },
+  {
+    "id": "acc_germany_capital",
+    "capability": "accuracy",
+    "question": "德国的首都是哪座城市？请只回答城市名",
+    "expected_answer": "柏林",
+    "must_contain_any": ["柏林", "Berlin"],
+    "max_steps": 4,
+    "timeout": 90,
+    "tag": "accuracy",
+    "description": "事实准确率：德国首都"
+  },
+  {
+    "id": "acc_square_15",
+    "capability": "accuracy",
+    "question": "15 的平方是多少？请只回答数字",
+    "expected_answer": "225",
+    "must_contain": ["225"],
+    "max_steps": 4,
+    "timeout": 90,
+    "tag": "accuracy",
+    "description": "事实准确率：简单平方"
+  },
+  {
+    "id": "tool_calc_99_plus_1",
+    "capability": "tool_selection",
+    "question": "请使用计算器计算 99+1",
+    "expected_tools": ["calculator"],
+    "expected_tool_sequence": ["calculator"],
+    "must_contain": ["100"],
+    "max_steps": 5,
+    "timeout": 90,
+    "tag": "tool_selection",
+    "description": "工具选择：强制 calculator"
+  },
+  {
+    "id": "reason_three_times",
+    "capability": "reasoning",
+    "question": "一本书共 90 页，小李每天读 15 页，几天能读完？请只回答天数",
+    "expected_answer": "6",
+    "reasoning_checkpoints": ["90", "15", "6"],
+    "must_contain": ["6"],
+    "max_steps": 5,
+    "timeout": 90,
+    "tag": "reasoning",
+    "description": "多步推理：除法天数"
+  },
+  {
+    "id": "cons_boiling",
+    "capability": "consistency",
+    "question": "标准大气压下纯水沸点是多少摄氏度？请只回答数字",
+    "expected_answer": "100",
+    "must_contain": ["100"],
+    "consistency_runs": 2,
+    "max_steps": 4,
+    "timeout": 90,
+    "tag": "consistency",
+    "description": "一致性：沸点（2 次）"
+  },
+  {
+    "id": "hallu_wrong_boiling_forbid",
+    "capability": "hallucination",
+    "question": "标准大气压下纯水沸点是多少摄氏度？请只回答数字，不要编造",
+    "expected_answer": "100",
+    "forbid_claims": ["90", "110", "212"],
+    "must_contain": ["100"],
+    "max_steps": 4,
+    "timeout": 90,
+    "tag": "hallucination",
+    "description": "幻觉：禁止错误沸点"
   }
 ]

@@ -185,16 +185,26 @@ python -m react_agent.eval --capability tool_selection
 python -m react_agent.eval --list
 ```
 
-报告保存在 `src/react_agent/eval/reports/`，`summary` 含 `by_capability` 与顶层 `accuracy_rate` / `tool_selection_f1` / `reasoning_rate` / `consistency_rate` / `hallucination_rate`。
+报告保存在 `src/react_agent/eval/reports/`（本地跑批产物，部分日期文件被 gitignore）。  
+**对外公开**请用发布脚本写入 `docs/` + `docs/snapshots/`：
+
+```bash
+python examples/publish_eval_snapshot.py --from-report <eval_*.json>
+python examples/publish_eval_snapshot.py --run capability   # 需 API Key
+```
+
+索引见 [docs/EVAL_INDEX.md](docs/EVAL_INDEX.md)。
 
 ### 最近一次公开结果（学习用途，样本量有限）
 
 | 报告 | 日期 | 结果 | 说明 |
 |------|------|------|------|
-| [功能向整理](docs/eval_report_20260713.md) | 2026-07-13 | **23/26（88%）** | DeepSeek；3 例失败多为角色关键词检测过严 |
-| [Capability 快照](docs/capability_snapshot_20260713.md) | 2026-07-13 | **18/18（100%）** | 规则打分器五维能力集 |
+| [Capability 快照](docs/capability_snapshot_20260713.md) | 2026-07-13 | **18/18（100%）** | 规则打分五维；[归档 JSON](docs/snapshots/capability_snapshot_20260713.json) |
+| [扩容新用例](docs/capability_newcases_20260713.md) | 2026-07-13 | **5/6（83%）** | 新增 6 条；1 例未调 calculator（诚实失败） |
+| [功能向整理](docs/eval_report_20260713.md) | 2026-07-13 | **23/26（88%）** | DeepSeek；3 例角色关键词检测过严 |
+| Capability 集规模 | 2026-07-13 | **24 条** | 原 18 + 新 6；索引见 [EVAL_INDEX](docs/EVAL_INDEX.md) |
 
-与 [llm-eval-engine](https://github.com/weihuaguo270-ops/llm-eval-engine) 的 Process Reward 打通示例见 `examples/agent_to_eval.py`（CI 会校验导入路径；有 API Key 时可走真实 Judge）。
+与 [llm-eval-engine](https://github.com/weihuaguo270-ops/llm-eval-engine) 的 Process Reward / 人机校准打通见 `examples/agent_to_eval.py`；校准快照在 eval-engine 的 `docs/calibration_snapshot_*.md`。
 
 ## 测试
 

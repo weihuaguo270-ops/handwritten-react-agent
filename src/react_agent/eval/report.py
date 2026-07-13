@@ -235,3 +235,151 @@ def list_reports(directory: Optional[str] = None) -> list[dict]:
         except (json.JSONDecodeError, OSError):
             continue
     return result
+
+
+def report_to_markdown(
+    report: dict,
+    *,
+    title: Optional[str] = None,
+    dataset_name: str = "",
+    extra_notes: Optional[list[str]] = None,
+    reproduce_cmd: str = "python -m react_agent.eval --dataset capability",
+) -> str:
+    """把 EvalRunner JSON 报告渲染为可公开的 Markdown 快照。"""
+    s = report.get("summary") or {}
+    total = s.get("total", 0)
+    passed = s.get("passed", 0)
+    rate = s.get("pass_rate", 0) or 0
+    title = title or f"评测快照（{report.get('report_id', 'eval')}）"
+
+    lines = [
+        f"# {title}",
+        "",
+        f"- **report_id:** `{report.get('report_id', '')}`",
+        f"- **timestamp:** {report.get('timestamp', '')}",
+        f"- **provider:** `{report.get('provider', '')}`",
+    ]
+    if dataset_name:
+        lines.append(f"- **dataset:** `{dataset_name}`")
+    lines.extend(
+        [
+            f"- **结果:** **{passed}/{total}（{rate * 100:.1f}%）**",
+            f"- **avg_duration:** {s.get('avg_duration', 0)}s · "
+            f"**avg_steps:** {s.get('avg_steps', 0)}",
+            "",
+        ]
+    )
+
+    cap_bits = []
+    for key, label in (
+        ("accuracy_rate", "accuracy"),
+        ("tool_selection_f1", "tool_f1"),
+        ("reasoning_rate", "reasoning"),
+        ("consistency_rate", "consistency"),
+        ("hallucination_rate", "hallucination_rate"),
+    ):
+        if key in s:
+            val = s[key]
+            if key.endswith("_rate"):
+                cap_bits.append(f"{label}={val * 100:.0f}%")
+            else:
+                cap_bits.append(f"{label}={val:.2f}")
+    if cap_bits:
+        lines.append("**能力摘要:** " + ", ".join(cap_bits))
+        lines.append("")
+
+    by_cap = report.get("by_capability") or {}
+    if by_cap:
+        lines.extend(
+            [
+                "## 按 capability",
+                "",
+                "| 维度 | 通过 | 通过率 | 附注 |",
+                "|------|:----:|:------:|------|",
+            ]
+        )
+        for cap, stats in sorted(by_cap.items()):
+            avg = stats.get("avg_metrics") or {}
+            note = ""
+            if "tool_f1" in avg:
+                note = f"F1={avg['tool_f1']:.2f}"
+            elif "consistency_rate" in avg:
+                note = f"cons={avg['consistency_rate']:.2f}"
+            elif "hallucination_rate" in avg:
+                note = f"hallu={avg['hallucination_rate']:.2f}"
+            lines.append(
+                f"| {cap} | {stats.get('passed', 0)}/{stats.get('total', 0)} | "
+                f"{(stats.get('pass_rate') or 0) * 100:.0f}% | {note} |"
+            )
+        lines.append("")
+
+    by_tag = report.get("by_tag") or {}
+    if by_tag and not by_cap:
+        lines.extend(
+            [
+                "## 按 tag",
+                "",
+                "| tag | 通过 | 通过率 |",
+                "|-----|:----:|:------:|",
+            ]
+        )
+        for tag, stats in sorted(by_tag.items()):
+            lines.append(
+                f"| {tag} | {stats.get('passed', 0)}/{stats.get('total', 0)} | "
+                f"{(stats.get('pass_rate') or 0) * 100:.0f}% |"
+            )
+        lines.append("")
+
+    results = report.get("results") or []
+    if results:
+        lines.extend(
+            [
+                "## 逐条结果",
+                "",
+                "| case_id | capability/tag | 结果 | 耗时(s) |",
+                "|---------|----------------|:----:|--------:|",
+            ]
+        )
+        for r in results:
+            ok = "PASS" if (r.get("score") or {}).get("passed") else "FAIL"
+            dim = r.get("capability") or r.get("tag") or "-"
+            lines.append(
+                f"| {r.get('case_id', '')} | {dim} | {ok} | "
+                f"{r.get('duration_seconds', 0)} |"
+            )
+        lines.append("")
+
+    failures = report.get("failures") or []
+    if failures:
+        lines.extend(["## 失败用例", ""])
+        for f in failures:
+            details = (f.get("score") or {}).get("details") or {}
+            reasons = [
+                d.get("reason", "")
+                for d in details.values()
+                if isinstance(d, dict) and not d.get("passed", True)
+            ]
+            reason = "; ".join(x for x in reasons if x) or "failed"
+            lines.append(f"- `{f.get('case_id', '')}`: {reason}")
+        lines.append("")
+
+    lines.extend(
+        [
+            "## 如何复现",
+            "",
+            "```bash",
+            reproduce_cmd,
+            "python examples/publish_eval_snapshot.py --from-report <json路径>",
+            "```",
+            "",
+            "> 学习用途快照：样本量有限，不代表生产基准。",
+            "",
+        ]
+    )
+    if extra_notes:
+        lines.append("## 备注")
+        lines.append("")
+        for n in extra_notes:
+            lines.append(f"- {n}")
+        lines.append("")
+    return "\n".join(lines)

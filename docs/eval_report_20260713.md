@@ -79,7 +79,17 @@
 
 ---
 
-## 能力覆盖矩阵
+## 如何复现
+
+```bash
+# 功能验证集（26 条）
+python -m react_agent.eval
+
+# 从 JSON 发布公开 Markdown（若有对应报告文件）
+python examples/publish_eval_snapshot.py --from-report src/react_agent/eval/reports/<report>.json
+```
+
+能力集与归档索引：[EVAL_INDEX.md](./EVAL_INDEX.md)。
 
 | 能力维度 | 覆盖情况 |
 |----------|---------|

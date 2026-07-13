@@ -1,0 +1,505 @@
+{
+  "report_id": "eval_20260713_181154",
+  "timestamp": "2026-07-13T18:11:54",
+  "provider": "deepseek",
+  "summary": {
+    "total": 6,
+    "passed": 5,
+    "failures": 1,
+    "pass_rate": 0.833,
+    "total_score": 5,
+    "max_score": 6,
+    "score_rate": 0.833,
+    "avg_duration": 28.64,
+    "avg_steps": 1.0,
+    "avg_tokens": 0.0,
+    "accuracy_rate": 1.0,
+    "tool_selection_f1": 0.0,
+    "reasoning_rate": 1.0,
+    "consistency_rate": 1.0,
+    "hallucination_rate": 0.0
+  },
+  "by_tag": {
+    "accuracy": {
+      "total": 2,
+      "passed": 2,
+      "total_duration": 52.349999999999994,
+      "pass_rate": 1.0
+    },
+    "tool_selection": {
+      "total": 1,
+      "passed": 0,
+      "total_duration": 24.24,
+      "pass_rate": 0.0
+    },
+    "reasoning": {
+      "total": 1,
+      "passed": 1,
+      "total_duration": 25.02,
+      "pass_rate": 1.0
+    },
+    "consistency": {
+      "total": 1,
+      "passed": 1,
+      "total_duration": 47.05,
+      "pass_rate": 1.0
+    },
+    "hallucination": {
+      "total": 1,
+      "passed": 1,
+      "total_duration": 23.18,
+      "pass_rate": 1.0
+    }
+  },
+  "by_capability": {
+    "accuracy": {
+      "total": 2,
+      "passed": 2,
+      "total_duration": 52.349999999999994,
+      "pass_rate": 1.0,
+      "avg_metrics": {
+        "accuracy": 1.0
+      }
+    },
+    "tool_selection": {
+      "total": 1,
+      "passed": 0,
+      "total_duration": 24.24,
+      "pass_rate": 0.0,
+      "avg_metrics": {
+        "tool_precision": 0.0,
+        "tool_recall": 0.0,
+        "tool_f1": 0.0,
+        "sequence_ok": 0.0
+      }
+    },
+    "reasoning": {
+      "total": 1,
+      "passed": 1,
+      "total_duration": 25.02,
+      "pass_rate": 1.0,
+      "avg_metrics": {
+        "reasoning_pass": 1.0,
+        "checkpoint_hit_rate": 1.0
+      }
+    },
+    "consistency": {
+      "total": 1,
+      "passed": 1,
+      "total_duration": 47.05,
+      "pass_rate": 1.0,
+      "avg_metrics": {
+        "consistency_rate": 1.0
+      }
+    },
+    "hallucination": {
+      "total": 1,
+      "passed": 1,
+      "total_duration": 23.18,
+      "pass_rate": 1.0,
+      "avg_metrics": {
+        "hallucinated": 0.0,
+        "hallucination_rate": 0.0
+      }
+    }
+  },
+  "results": [
+    {
+      "case_id": "acc_germany_capital",
+      "question": "德国的首都是哪座城市？请只回答城市名",
+      "tag": "accuracy",
+      "capability": "accuracy",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 31.74,
+      "trajectory_file": "20260713_180932_krhd",
+      "total_steps": 1,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "accuracy": 1.0
+        },
+        "details": {
+          "accuracy": {
+            "passed": true,
+            "reason": "命中: ['柏林']",
+            "answer": "柏林"
+          }
+        },
+        "capability": "accuracy",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "无预期工具要求"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中关键词: ['柏林']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "1/4 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "accuracy": 1.0
+      }
+    },
+    {
+      "case_id": "acc_square_15",
+      "question": "15 的平方是多少？请只回答数字",
+      "tag": "accuracy",
+      "capability": "accuracy",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 20.61,
+      "trajectory_file": "20260713_180952_7jx4",
+      "total_steps": 1,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "accuracy": 1.0
+        },
+        "details": {
+          "accuracy": {
+            "passed": true,
+            "reason": "命中: ['225', '225']",
+            "answer": "225"
+          }
+        },
+        "capability": "accuracy",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "无预期工具要求"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中全部关键词: ['225']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "1/4 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "accuracy": 1.0
+      }
+    },
+    {
+      "case_id": "tool_calc_99_plus_1",
+      "question": "请使用计算器计算 99+1",
+      "tag": "tool_selection",
+      "capability": "tool_selection",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 24.24,
+      "trajectory_file": "20260713_181016_2mew",
+      "total_steps": 1,
+      "total_tokens": 0,
+      "score": {
+        "passed": false,
+        "metrics": {
+          "tool_precision": 0.0,
+          "tool_recall": 0.0,
+          "tool_f1": 0.0,
+          "sequence_ok": false
+        },
+        "details": {
+          "tool_selection": {
+            "passed": false,
+            "reason": "actual=[], groups=[['calculator']], P=0.00 R=0.00 F1=0.00, sequence_ok=False"
+          }
+        },
+        "capability": "tool_selection",
+        "functional": {
+          "total": 3,
+          "max_score": 4,
+          "passed": false,
+          "details": {
+            "tool_match": {
+              "passed": false,
+              "reason": "预期工具: ['calculator']，实际调用: (无)"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中全部关键词: ['100']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "1/5 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 0,
+        "max_score": 1
+      },
+      "metrics": {
+        "tool_precision": 0.0,
+        "tool_recall": 0.0,
+        "tool_f1": 0.0,
+        "sequence_ok": false
+      }
+    },
+    {
+      "case_id": "reason_three_times",
+      "question": "一本书共 90 页，小李每天读 15 页，几天能读完？请只回答天数",
+      "tag": "reasoning",
+      "capability": "reasoning",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 25.02,
+      "trajectory_file": "20260713_181040_0bnw",
+      "total_steps": 1,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "reasoning_pass": 1.0,
+          "checkpoint_hit_rate": 1.0
+        },
+        "details": {
+          "reasoning": {
+            "passed": true,
+            "reason": "checkpoints_ok=True, answer_ok=True",
+            "answer": "6天"
+          }
+        },
+        "capability": "reasoning",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "无预期工具要求"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中全部关键词: ['6']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "1/5 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "reasoning_pass": 1.0,
+        "checkpoint_hit_rate": 1.0
+      }
+    },
+    {
+      "case_id": "cons_boiling",
+      "question": "标准大气压下纯水沸点是多少摄氏度？请只回答数字",
+      "tag": "consistency",
+      "capability": "consistency",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 47.05,
+      "trajectory_file": "20260713_181128_cw1d",
+      "total_steps": 1,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "consistency_rate": 1.0
+        },
+        "details": {
+          "consistency": {
+            "passed": true,
+            "reason": "runs=2, unique=1, consistency_rate=1.00",
+            "answers": [
+              "100",
+              "100"
+            ]
+          }
+        },
+        "capability": "consistency",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "无预期工具要求"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中全部关键词: ['100']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "1/4 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "consistency_rate": 1.0
+      }
+    },
+    {
+      "case_id": "hallu_wrong_boiling_forbid",
+      "question": "标准大气压下纯水沸点是多少摄氏度？请只回答数字，不要编造",
+      "tag": "hallucination",
+      "capability": "hallucination",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 23.18,
+      "trajectory_file": "20260713_181151_46vs",
+      "total_steps": 1,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "hallucinated": 0.0,
+          "hallucination_rate": 0.0
+        },
+        "details": {
+          "hallucination": {
+            "passed": true,
+            "reason": "未发现幻觉哨兵 / 主张可 grounding",
+            "answer": "100"
+          }
+        },
+        "capability": "hallucination",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "无预期工具要求"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中全部关键词: ['100']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "1/4 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "hallucinated": 0.0,
+        "hallucination_rate": 0.0
+      }
+    }
+  ],
+  "failures": [
+    {
+      "case_id": "tool_calc_99_plus_1",
+      "question": "请使用计算器计算 99+1",
+      "tag": "tool_selection",
+      "capability": "tool_selection",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 24.24,
+      "trajectory_file": "20260713_181016_2mew",
+      "total_steps": 1,
+      "total_tokens": 0,
+      "score": {
+        "passed": false,
+        "metrics": {
+          "tool_precision": 0.0,
+          "tool_recall": 0.0,
+          "tool_f1": 0.0,
+          "sequence_ok": false
+        },
+        "details": {
+          "tool_selection": {
+            "passed": false,
+            "reason": "actual=[], groups=[['calculator']], P=0.00 R=0.00 F1=0.00, sequence_ok=False"
+          }
+        },
+        "capability": "tool_selection",
+        "functional": {
+          "total": 3,
+          "max_score": 4,
+          "passed": false,
+          "details": {
+            "tool_match": {
+              "passed": false,
+              "reason": "预期工具: ['calculator']，实际调用: (无)"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中全部关键词: ['100']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "1/5 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 0,
+        "max_score": 1
+      },
+      "metrics": {
+        "tool_precision": 0.0,
+        "tool_recall": 0.0,
+        "tool_f1": 0.0,
+        "sequence_ok": false
+      }
+    }
+  ]
+}

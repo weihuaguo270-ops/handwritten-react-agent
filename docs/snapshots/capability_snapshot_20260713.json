@@ -1,0 +1,1121 @@
+{
+  "report_id": "eval_20260713_140216",
+  "timestamp": "2026-07-13T14:02:16",
+  "provider": "default",
+  "summary": {
+    "total": 18,
+    "passed": 18,
+    "failures": 0,
+    "pass_rate": 1.0,
+    "total_score": 18,
+    "max_score": 18,
+    "score_rate": 1.0,
+    "avg_duration": 29.12,
+    "avg_steps": 1.6,
+    "avg_tokens": 0.0,
+    "accuracy_rate": 1.0,
+    "tool_selection_f1": 1.0,
+    "reasoning_rate": 1.0,
+    "consistency_rate": 1.0,
+    "hallucination_rate": 0.0
+  },
+  "by_tag": {
+    "accuracy": {
+      "total": 4,
+      "passed": 4,
+      "total_duration": 30.880000000000003,
+      "pass_rate": 1.0
+    },
+    "tool_selection": {
+      "total": 4,
+      "passed": 4,
+      "total_duration": 88.52,
+      "pass_rate": 1.0
+    },
+    "reasoning": {
+      "total": 3,
+      "passed": 3,
+      "total_duration": 70.47,
+      "pass_rate": 1.0
+    },
+    "consistency": {
+      "total": 3,
+      "passed": 3,
+      "total_duration": 217.41000000000003,
+      "pass_rate": 1.0
+    },
+    "hallucination": {
+      "total": 4,
+      "passed": 4,
+      "total_duration": 116.81,
+      "pass_rate": 1.0
+    }
+  },
+  "by_capability": {
+    "accuracy": {
+      "total": 4,
+      "passed": 4,
+      "total_duration": 30.880000000000003,
+      "pass_rate": 1.0,
+      "avg_metrics": {
+        "accuracy": 1.0
+      }
+    },
+    "tool_selection": {
+      "total": 4,
+      "passed": 4,
+      "total_duration": 88.52,
+      "pass_rate": 1.0,
+      "avg_metrics": {
+        "tool_precision": 1.0,
+        "tool_recall": 1.0,
+        "tool_f1": 1.0,
+        "sequence_ok": 1.0
+      }
+    },
+    "reasoning": {
+      "total": 3,
+      "passed": 3,
+      "total_duration": 70.47,
+      "pass_rate": 1.0,
+      "avg_metrics": {
+        "reasoning_pass": 1.0,
+        "checkpoint_hit_rate": 1.0
+      }
+    },
+    "consistency": {
+      "total": 3,
+      "passed": 3,
+      "total_duration": 217.41000000000003,
+      "pass_rate": 1.0,
+      "avg_metrics": {
+        "consistency_rate": 1.0
+      }
+    },
+    "hallucination": {
+      "total": 4,
+      "passed": 4,
+      "total_duration": 116.81,
+      "pass_rate": 1.0,
+      "avg_metrics": {
+        "hallucinated": 0.0,
+        "hallucination_rate": 0.0
+      }
+    }
+  },
+  "results": [
+    {
+      "case_id": "acc_france_capital",
+      "question": "法国的首都是什么？请只回答城市名",
+      "tag": "accuracy",
+      "capability": "accuracy",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 5.65,
+      "trajectory_file": "20260713_135337_2ckr",
+      "total_steps": 1,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "accuracy": 1.0
+        },
+        "details": {
+          "accuracy": {
+            "passed": true,
+            "reason": "命中: ['巴黎']",
+            "answer": "巴黎"
+          }
+        },
+        "capability": "accuracy",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "无预期工具要求"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中关键词: ['巴黎']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "1/4 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "accuracy": 1.0
+      }
+    },
+    {
+      "case_id": "acc_lu_xun_year",
+      "question": "鲁迅的《狂人日记》是哪一年发表的？请只回答年份",
+      "tag": "accuracy",
+      "capability": "accuracy",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 11.27,
+      "trajectory_file": "20260713_135342_lcag",
+      "total_steps": 2,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "accuracy": 1.0
+        },
+        "details": {
+          "accuracy": {
+            "passed": true,
+            "reason": "命中: ['1918', '1918']",
+            "answer": "1918年"
+          }
+        },
+        "capability": "accuracy",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "无预期工具要求"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中全部关键词: ['1918']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "2/4 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "accuracy": 1.0
+      }
+    },
+    {
+      "case_id": "acc_calc_product",
+      "question": "计算 1234 × 5678 等于多少？请给出最终数字",
+      "tag": "accuracy",
+      "capability": "accuracy",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 7.78,
+      "trajectory_file": "20260713_135354_lafp",
+      "total_steps": 2,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "accuracy": 1.0
+        },
+        "details": {
+          "accuracy": {
+            "passed": true,
+            "reason": "命中: ['7006652', '7006652']",
+            "answer": "7006652"
+          }
+        },
+        "capability": "accuracy",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "命中预期工具: {'calculator'}"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中全部关键词: ['7006652']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "2/5 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "accuracy": 1.0
+      }
+    },
+    {
+      "case_id": "acc_water_boiling",
+      "question": "在标准大气压下，纯水的沸点是多少摄氏度？请只回答数字",
+      "tag": "accuracy",
+      "capability": "accuracy",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 6.18,
+      "trajectory_file": "20260713_135401_z9tm",
+      "total_steps": 1,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "accuracy": 1.0
+        },
+        "details": {
+          "accuracy": {
+            "passed": true,
+            "reason": "命中: ['100', '100']",
+            "answer": "100"
+          }
+        },
+        "capability": "accuracy",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "无预期工具要求"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中全部关键词: ['100']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "1/4 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "accuracy": 1.0
+      }
+    },
+    {
+      "case_id": "tool_calc_required",
+      "question": "请使用计算器工具计算 (23+45)*2",
+      "tag": "tool_selection",
+      "capability": "tool_selection",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 7.07,
+      "trajectory_file": "20260713_135408_ahl0",
+      "total_steps": 2,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "tool_precision": 1.0,
+          "tool_recall": 1.0,
+          "tool_f1": 1.0,
+          "sequence_ok": true
+        },
+        "details": {
+          "tool_selection": {
+            "passed": true,
+            "reason": "actual=['calculator'], groups=[['calculator']], P=1.00 R=1.00 F1=1.00, sequence_ok=True"
+          }
+        },
+        "capability": "tool_selection",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "命中预期工具: {'calculator'}"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中全部关键词: ['136']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "2/5 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "tool_precision": 1.0,
+        "tool_recall": 1.0,
+        "tool_f1": 1.0,
+        "sequence_ok": true
+      }
+    },
+    {
+      "case_id": "tool_time_required",
+      "question": "现在几点了？请调用时间工具回答",
+      "tag": "tool_selection",
+      "capability": "tool_selection",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 11.71,
+      "trajectory_file": "20260713_135417_y1xp",
+      "total_steps": 2,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "tool_precision": 1.0,
+          "tool_recall": 1.0,
+          "tool_f1": 1.0
+        },
+        "details": {
+          "tool_selection": {
+            "passed": true,
+            "reason": "actual=['get_current_time'], groups=[['get_time', 'get_current_time']], P=1.00 R=1.00 F1=1.00"
+          }
+        },
+        "capability": "tool_selection",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "命中预期工具: {'get_current_time'}"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "无预期关键词"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "2/5 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "tool_precision": 1.0,
+        "tool_recall": 1.0,
+        "tool_f1": 1.0
+      }
+    },
+    {
+      "case_id": "tool_search_weather",
+      "question": "搜索一下今天北京的天气温度",
+      "tag": "tool_selection",
+      "capability": "tool_selection",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 36.83,
+      "trajectory_file": "20260713_135426_khj1",
+      "total_steps": 3,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "tool_precision": 1.0,
+          "tool_recall": 1.0,
+          "tool_f1": 1.0
+        },
+        "details": {
+          "tool_selection": {
+            "passed": true,
+            "reason": "actual=['get_current_time', 'web_search', 'fetch_page'], groups=[['web_search']], P=1.00 R=1.00 F1=1.00"
+          }
+        },
+        "capability": "tool_selection",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "命中预期工具: {'web_search'}"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "无预期关键词"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "3/5 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "tool_precision": 1.0,
+        "tool_recall": 1.0,
+        "tool_f1": 1.0
+      }
+    },
+    {
+      "case_id": "tool_time_then_calc",
+      "question": "先告诉我现在时间，再计算 100/7 约等于多少",
+      "tag": "tool_selection",
+      "capability": "tool_selection",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 32.91,
+      "trajectory_file": "20260713_135524_6shc",
+      "total_steps": 2,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "tool_precision": 1.0,
+          "tool_recall": 1.0,
+          "tool_f1": 1.0
+        },
+        "details": {
+          "tool_selection": {
+            "passed": true,
+            "reason": "actual=['get_current_time', 'calculator'], groups=[['get_time', 'get_current_time'], ['calculator']], P=1.00 R=1.00 F1=1.00"
+          }
+        },
+        "capability": "tool_selection",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "命中预期工具: {'calculator', 'get_current_time'}"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中关键词: ['14', '14.2', '14.28']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "2/8 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "tool_precision": 1.0,
+        "tool_recall": 1.0,
+        "tool_f1": 1.0
+      }
+    },
+    {
+      "case_id": "reason_lily_pad",
+      "question": "一个池塘里有一片荷叶，每天面积翻一倍。第 30 天荷叶覆盖整个池塘。问：第几天荷叶覆盖一半的池塘？请给出天数",
+      "tag": "reasoning",
+      "capability": "reasoning",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 21.98,
+      "trajectory_file": "20260713_135551_lvkd",
+      "total_steps": 1,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "reasoning_pass": 1.0,
+          "checkpoint_hit_rate": 1.0
+        },
+        "details": {
+          "reasoning": {
+            "passed": true,
+            "reason": "checkpoints_ok=True, answer_ok=True",
+            "answer": "第 29 天"
+          }
+        },
+        "capability": "reasoning",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "无预期工具要求"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中全部关键词: ['29']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "1/5 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "reasoning_pass": 1.0,
+        "checkpoint_hit_rate": 1.0
+      }
+    },
+    {
+      "case_id": "reason_ages",
+      "question": "小明比小红大 3 岁，两人年龄之和是 25 岁。小明多少岁？请只回答数字",
+      "tag": "reasoning",
+      "capability": "reasoning",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 21.97,
+      "trajectory_file": "20260713_135613_62c6",
+      "total_steps": 1,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "reasoning_pass": 1.0,
+          "checkpoint_hit_rate": 1.0
+        },
+        "details": {
+          "reasoning": {
+            "passed": true,
+            "reason": "checkpoints_ok=True, answer_ok=True",
+            "answer": "14"
+          }
+        },
+        "capability": "reasoning",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "无预期工具要求"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中全部关键词: ['14']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "1/5 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "reasoning_pass": 1.0,
+        "checkpoint_hit_rate": 1.0
+      }
+    },
+    {
+      "case_id": "reason_chain_calc",
+      "question": "先计算 12*12，再把结果加 7，最终是多少？请用计算器",
+      "tag": "reasoning",
+      "capability": "reasoning",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 26.52,
+      "trajectory_file": "20260713_135639_1679",
+      "total_steps": 2,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "reasoning_pass": 1.0,
+          "checkpoint_hit_rate": 1.0
+        },
+        "details": {
+          "reasoning": {
+            "passed": true,
+            "reason": "checkpoints_ok=True, answer_ok=True",
+            "answer": "151"
+          }
+        },
+        "capability": "reasoning",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "命中预期工具: {'calculator'}"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中全部关键词: ['151']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "2/6 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "reasoning_pass": 1.0,
+        "checkpoint_hit_rate": 1.0
+      }
+    },
+    {
+      "case_id": "cons_lu_xun",
+      "question": "鲁迅的《狂人日记》是哪一年发表的？请只回答四位年份",
+      "tag": "consistency",
+      "capability": "consistency",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 71.39,
+      "trajectory_file": "20260713_135752_q2dd",
+      "total_steps": 1,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "consistency_rate": 1.0
+        },
+        "details": {
+          "consistency": {
+            "passed": true,
+            "reason": "runs=3, unique=1, consistency_rate=1.00",
+            "answers": [
+              "1918",
+              "1918",
+              "1918"
+            ]
+          }
+        },
+        "capability": "consistency",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "无预期工具要求"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中全部关键词: ['1918']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "1/4 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "consistency_rate": 1.0
+      }
+    },
+    {
+      "case_id": "cons_capital",
+      "question": "日本的首都是哪座城市？请只回答城市名",
+      "tag": "consistency",
+      "capability": "consistency",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 72.59,
+      "trajectory_file": "20260713_135905_h68o",
+      "total_steps": 1,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "consistency_rate": 1.0
+        },
+        "details": {
+          "consistency": {
+            "passed": true,
+            "reason": "runs=3, unique=1, consistency_rate=1.00",
+            "answers": [
+              "东京",
+              "东京",
+              "东京"
+            ]
+          }
+        },
+        "capability": "consistency",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "无预期工具要求"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中关键词: ['东京']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "1/4 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "consistency_rate": 1.0
+      }
+    },
+    {
+      "case_id": "cons_math",
+      "question": "7 的平方是多少？请只回答数字",
+      "tag": "consistency",
+      "capability": "consistency",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 73.43,
+      "trajectory_file": "20260713_140018_9aif",
+      "total_steps": 1,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "consistency_rate": 1.0
+        },
+        "details": {
+          "consistency": {
+            "passed": true,
+            "reason": "runs=3, unique=1, consistency_rate=1.00",
+            "answers": [
+              "49",
+              "49",
+              "49"
+            ]
+          }
+        },
+        "capability": "consistency",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "无预期工具要求"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中全部关键词: ['49']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "1/4 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "consistency_rate": 1.0
+      }
+    },
+    {
+      "case_id": "hallu_wrong_year_forbid",
+      "question": "鲁迅的《狂人日记》是哪一年发表的？请只回答年份，不要编造",
+      "tag": "hallucination",
+      "capability": "hallucination",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 24.03,
+      "trajectory_file": "20260713_140041_fonp",
+      "total_steps": 1,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "hallucinated": 0.0,
+          "hallucination_rate": 0.0
+        },
+        "details": {
+          "hallucination": {
+            "passed": true,
+            "reason": "未发现幻觉哨兵 / 主张可 grounding",
+            "answer": "1918年"
+          }
+        },
+        "capability": "hallucination",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "无预期工具要求"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中全部关键词: ['1918']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "1/4 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "hallucinated": 0.0,
+        "hallucination_rate": 0.0
+      }
+    },
+    {
+      "case_id": "hallu_wrong_capital_forbid",
+      "question": "法国的首都是什么？请只回答城市名",
+      "tag": "hallucination",
+      "capability": "hallucination",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 27.69,
+      "trajectory_file": "20260713_140109_50je",
+      "total_steps": 1,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "hallucinated": 0.0,
+          "hallucination_rate": 0.0
+        },
+        "details": {
+          "hallucination": {
+            "passed": true,
+            "reason": "未发现幻觉哨兵 / 主张可 grounding",
+            "answer": "巴黎"
+          }
+        },
+        "capability": "hallucination",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "无预期工具要求"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中关键词: ['巴黎']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "1/4 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "hallucinated": 0.0,
+        "hallucination_rate": 0.0
+      }
+    },
+    {
+      "case_id": "hallu_calc_grounded",
+      "question": "请用计算器计算 1234*5678，只根据工具结果回答最终数字",
+      "tag": "hallucination",
+      "capability": "hallucination",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 22.74,
+      "trajectory_file": "20260713_140131_r6dj",
+      "total_steps": 2,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "hallucinated": 0.0,
+          "hallucination_rate": 0.0
+        },
+        "details": {
+          "hallucination": {
+            "passed": true,
+            "reason": "未发现幻觉哨兵 / 主张可 grounding",
+            "answer": "7006652"
+          }
+        },
+        "capability": "hallucination",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "命中预期工具: {'calculator'}"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "命中全部关键词: ['7006652']"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "2/5 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "hallucinated": 0.0,
+        "hallucination_rate": 0.0
+      }
+    },
+    {
+      "case_id": "hallu_no_fake_nobel",
+      "question": "2025 年诺贝尔物理学奖得主是谁？如果不确定请说明不确定，不要编造具体姓名年份以外的虚假奖项细节",
+      "tag": "hallucination",
+      "capability": "hallucination",
+      "timed_out": false,
+      "exit_code": 0,
+      "duration_seconds": 42.35,
+      "trajectory_file": "20260713_140155_b1tm",
+      "total_steps": 3,
+      "total_tokens": 0,
+      "score": {
+        "passed": true,
+        "metrics": {
+          "hallucinated": 0.0,
+          "hallucination_rate": 0.0
+        },
+        "details": {
+          "hallucination": {
+            "passed": true,
+            "reason": "未发现幻觉哨兵 / 主张可 grounding",
+            "answer": "根据诺贝尔奖官网的权威信息，2025年诺贝尔物理学奖得主如下：\n\n---\n\n**2025年诺贝尔物理学奖得主（共三人）：**\n\n1. **约翰·克拉克**（John Clarke，美国）\n2. **米歇尔·H·德沃雷**（Michel H. Devoret，美国）\n3. **约翰·M·马蒂尼斯**（John M. Martinis，美国）\n\n**获奖理由**：表彰他们 **\"发现了电路中的宏观量子"
+          }
+        },
+        "capability": "hallucination",
+        "functional": {
+          "total": 4,
+          "max_score": 4,
+          "passed": true,
+          "details": {
+            "tool_match": {
+              "passed": true,
+              "reason": "无预期工具要求"
+            },
+            "content_match": {
+              "passed": true,
+              "reason": "无预期关键词"
+            },
+            "step_control": {
+              "passed": true,
+              "reason": "3/6 步"
+            },
+            "has_answer": {
+              "passed": true,
+              "reason": "有最终答案"
+            }
+          }
+        },
+        "total": 1,
+        "max_score": 1
+      },
+      "metrics": {
+        "hallucinated": 0.0,
+        "hallucination_rate": 0.0
+      }
+    }
+  ],
+  "failures": []
+}
