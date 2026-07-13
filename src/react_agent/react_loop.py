@@ -30,7 +30,7 @@ from react_agent.prompts import ROLE_MANAGER
 from react_agent.context import CONTEXT
 from react_agent.harness import start_trajectory, current_trajectory, finish_trajectory
 from react_agent.harness import SANDBOX
-from react_agent.llm import LLM_DEFAULT, LLM
+from react_agent.llm import LLM_DEFAULT, LLM, get_default_llm
 from react_agent.tools import TOOL_REGISTRY, TOOL_DEFINITIONS
 
 # 供外部读取的上一次轨迹步骤数据（Orchestrator 共享数据用）
@@ -73,6 +73,9 @@ def _ensure_rag_loaded():
     if _rag_loaded:
         return
     _rag_loaded = True
+    if os.environ.get("REACT_AGENT_SKIP_RAG", "").strip() in ("1", "true", "True"):
+        print("[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载")
+        return
     print("[启动] 正在加载 RAG 知识库...")
     _rag_dir = os.path.dirname(os.path.abspath(__file__))
     try:
@@ -85,7 +88,7 @@ def _ensure_rag_loaded():
 # ============================================================
 # 第一步：配置 — 通过 llm_config.json + LLM_PROVIDER 环境变量
 # ============================================================
-# 当前 provider 由 LLM_DEFAULT 决定（模块加载时自动从配置读取）
+# 当前 provider 由 get_default_llm() 决定（支持 CI 注入 Secret 后懒加载）
 # 切换 provider 方式：
 #   1. Windows: set LLM_PROVIDER=openai
 #   2. Linux:   export LLM_PROVIDER=ollama
@@ -93,6 +96,14 @@ def _ensure_rag_loaded():
 #   4. 代码中手动创建：llm = LLM(provider="openai")
 # 注意：不要提交 API Key 到 Git！
 _current_llm = LLM_DEFAULT
+
+
+def _active_llm():
+    """运行时解析 LLM，避免模块导入时尚未读到环境变量。"""
+    global _current_llm
+    _current_llm = get_default_llm()
+    return _current_llm
+
 
 # ============================================================
 # 第二步：工具 — 由 tools/ 模块统一管理
@@ -107,7 +118,7 @@ _current_llm = LLM_DEFAULT
 def call_llm(messages, max_retries=2, tool_defs=None,
              temperature=None, max_tokens=None):
     """调用 LLM，返回消息对象。使用 _current_llm（可通过 LLM_PROVIDER 切换）"""
-    return _current_llm.chat(
+    return _active_llm().chat(
         messages,
         tool_defs=tool_defs if tool_defs is not None else TOOL_DEFINITIONS,
         temperature=temperature,
@@ -173,8 +184,17 @@ def react_loop(user_query, max_steps=10, tool_defs=None):
     system_prompt = COT.inject(role_enhanced, query=user_query)
     print(f"[角色] {ROLE_MANAGER.current_role_name()}")
 
+    llm = _active_llm()
+    if llm is None or (
+        llm.provider_name != "ollama" and not (llm.api_key or "").strip()
+    ):
+        raise RuntimeError(
+            "LLM 未配置 API Key。请设置 DEEPSEEK_API_KEY / OPENAI_API_KEY，"
+            "或复制 llm_config.example.json 为 llm_config.json。"
+        )
+
     # 开始轨迹记录
-    start_trajectory(user_query, _current_llm.model, system_prompt)
+    start_trajectory(user_query, llm.model, system_prompt)
 
     messages = [
         {"role": "system", "content": system_prompt},

@@ -227,6 +227,8 @@ pytest tests/test_real_llm.py -v -m real_llm
 gh secret set DEEPSEEK_API_KEY --repo weihuaguo270-ops/react-agent < <(grep '^DEEPSEEK_API_KEY=' .env | cut -d= -f2-)
 ```
 
+仓库忽略本地 `llm_config.json`；CI / 新环境会回退到已提交的 [`llm_config.example.json`](llm_config.example.json)（Key 仍只来自环境变量 / Secret）。
+
 ## 环境要求
 
 - Python 3.10+

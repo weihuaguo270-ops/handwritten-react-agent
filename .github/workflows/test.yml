@@ -114,6 +114,7 @@ jobs:
         DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         LLM_PROVIDER: deepseek
         REACT_AGENT_SANDBOX_PREWARM: "0"
+        REACT_AGENT_SKIP_RAG: "1"
       run: |
         pytest tests/test_real_llm.py -v -m real_llm_smoke --tb=short \
           --junitxml=real-llm-smoke-junit.xml
@@ -150,6 +151,7 @@ jobs:
         DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         LLM_PROVIDER: deepseek
         REACT_AGENT_SANDBOX_PREWARM: "0"
+        REACT_AGENT_SKIP_RAG: "1"
       run: |
         pytest tests/test_real_llm.py -v -m real_llm --tb=short \
           --junitxml=real-llm-full-junit.xml

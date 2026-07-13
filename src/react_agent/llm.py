@@ -31,13 +31,16 @@ from typing import Optional
 from urllib import request as req
 from urllib.error import URLError
 
-# 查找 llm_config.json：包目录 → 项目根 → 当前工作目录
+# 查找 llm_config.json：包目录 → 项目根 → 当前工作目录 → example 模板
 _pkg_dir = os.path.dirname(os.path.abspath(__file__))
 _project_root = os.path.abspath(os.path.join(_pkg_dir, "..", ".."))
 _candidates = [
     os.path.join(_pkg_dir, "llm_config.json"),
     os.path.join(_project_root, "llm_config.json"),
     os.path.join(os.getcwd(), "llm_config.json"),
+    os.path.join(_project_root, "llm_config.example.json"),
+    os.path.join(os.getcwd(), "llm_config.example.json"),
+    os.path.join(_pkg_dir, "llm_config.example.json"),
 ]
 CONFIG_FILE = next((p for p in _candidates if os.path.exists(p)), _candidates[0])
 
@@ -250,11 +253,22 @@ class LLM:
 # 模块加载时自动创建，供 react_loop.py 等模块直接使用。
 # 用户可通过 LLM_PROVIDER 环境变量切换默认 provider，
 # 或手动创建 LLM(provider="openai") 使用不同模型。
+# CI 等场景：.env / Secret 可能在首次 import 之后才就绪，用 get_default_llm() 懒加载。
 try:
     LLM_DEFAULT = LLM()
 except (FileNotFoundError, ValueError) as e:
     print(f"[警告] LLM 初始化失败: {e}")
     LLM_DEFAULT = None
+
+
+def get_default_llm(force_reload: bool = False) -> LLM:
+    """返回可用的默认 LLM；必要时在运行时重新初始化（读取当前环境变量）。"""
+    global LLM_DEFAULT
+    if force_reload or LLM_DEFAULT is None:
+        LLM_DEFAULT = LLM()
+    elif not (LLM_DEFAULT.api_key or "").strip() and LLM_DEFAULT.provider_name != "ollama":
+        LLM_DEFAULT = LLM(provider=LLM_DEFAULT.provider_name)
+    return LLM_DEFAULT
 
 
 def list_providers() -> list[str]:

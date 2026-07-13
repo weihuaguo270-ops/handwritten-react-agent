@@ -1,0 +1,43 @@
+{
+  "default": "deepseek",
+  "providers": {
+    "deepseek": {
+      "description": "DeepSeek 官方 API",
+      "base_url": "https://api.deepseek.com",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "api_key": "",
+      "model_env": "LLM_MODEL",
+      "model": "deepseek-chat",
+      "temperature": 0.7,
+      "max_tokens": 2000
+    },
+    "openai": {
+      "description": "OpenAI API（兼容 GPT-4o / GPT-4o-mini 等）",
+      "base_url": "https://api.openai.com/v1",
+      "api_key_env": "OPENAI_API_KEY",
+      "api_key": "",
+      "model": "gpt-4o-mini",
+      "temperature": 0.7,
+      "max_tokens": 2000
+    },
+    "ollama": {
+      "description": "本地 Ollama（需先启动 ollama serve）",
+      "base_url": "http://localhost:11434/v1",
+      "api_key_env": "",
+      "api_key": "",
+      "model": "qwen2.5:7b",
+      "temperature": 0.7,
+      "max_tokens": 2000
+    },
+    "custom": {
+      "description": "任意 OpenAI 兼容 API（通过环境变量指定）",
+      "base_url_env": "LLM_BASE_URL",
+      "api_key_env": "LLM_API_KEY",
+      "api_key": "",
+      "model_env": "LLM_MODEL",
+      "model": "gpt-4o-mini",
+      "temperature": 0.7,
+      "max_tokens": 2000
+    }
+  }
+}
