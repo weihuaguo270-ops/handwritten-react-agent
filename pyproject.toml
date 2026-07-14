@@ -5,14 +5,26 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "react-agent"
 version = "0.1.0"
-description = "手写 ReAct Agent — 零框架实现 LLM Agent 核心循环"
+description = "手写 ReAct Agent — 学习用实现（非生产运行时）"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
-dependencies = [
-    "numpy",
-    "scikit-learn",
-    "sentence-transformers",
+# Core install stays light: ReAct loop / tools / harness do not need embedding models.
+# Memory keyword fallback works without sklearn; semantic memory/RAG need [rag].
+dependencies = []
+
+[project.optional-dependencies]
+rag = [
+    "numpy>=1.24,<3",
+    "scikit-learn>=1.3,<2",
+    "sentence-transformers>=2.2,<4",
+]
+test = [
+    "pytest>=7.0,<9",
+    "flake8>=6.0,<8",
+]
+dev = [
+    "react-agent[rag,test]",
 ]
 
 [project.scripts]

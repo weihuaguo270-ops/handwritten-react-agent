@@ -1,7 +1,10 @@
 """
 Memory — 独立的语义记忆模块
 ============================
-基于 BGE-small-zh-v1.5 的语义记忆系统，支持：
+有 `[rag]` 依赖时：基于 BGE-small-zh-v1.5 的语义记忆。
+无依赖时：降级为关键词匹配（保证核心 Agent 可安装、可跑）。
+
+支持：
 - 增: add() / auto_extract()
 - 删: remove() / clear()
 - 查: query()
@@ -10,8 +13,16 @@ Memory — 独立的语义记忆模块
 注意：BGE 模型采用懒加载，首次写/查记忆时才会加载。
 """
 import json
-import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
+import time
+
+try:
+    import numpy as np
+    from sklearn.metrics.pairwise import cosine_similarity
+    _HAS_VECTOR = True
+except ImportError:  # pragma: no cover - exercised when installed without [rag]
+    np = None
+    cosine_similarity = None
+    _HAS_VECTOR = False
 
 
 class Memory:
@@ -29,8 +40,15 @@ class Memory:
         self._model = None  # 懒加载：首次使用时才加载
         self._load()
 
+    def _semantic_ready(self) -> bool:
+        return _HAS_VECTOR
+
     def _get_model(self):
         """首次访问时加载 BGE 模型，后续复用"""
+        if not _HAS_VECTOR:
+            raise ImportError(
+                '语义记忆需要: pip install -e ".[rag]"'
+            )
         if self._model is None:
             from sentence_transformers import SentenceTransformer
             print("  [记忆] 加载语义模型...")
@@ -42,12 +60,17 @@ class Memory:
             with open(self.save_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             self.facts = data.get("facts", [])
-            self.vecs = [np.array(v) for v in data.get("vecs", [])]
+            raw_vecs = data.get("vecs", [])
+            if _HAS_VECTOR and np is not None:
+                self.vecs = [np.array(v) for v in raw_vecs]
+            else:
+                self.vecs = raw_vecs
             self.access_count = data.get("access_count", [0] * len(self.facts))
             self.last_access = data.get("last_access", [0] * len(self.facts))
             if self.facts:
-                print(f"[记忆] 已加载 {len(self.facts)} 条记忆（模型懒加载）")
-        except:
+                mode = "语义" if _HAS_VECTOR else "关键词降级"
+                print(f"[记忆] 已加载 {len(self.facts)} 条记忆（{mode}）")
+        except Exception:
             self.facts = []
             self.vecs = []
             self.access_count = []
@@ -55,9 +78,15 @@ class Memory:
 
     def _save(self):
         with open(self.save_path, "w", encoding="utf-8") as f:
+            serial_vecs = []
+            for v in self.vecs:
+                if _HAS_VECTOR and np is not None and hasattr(v, "__iter__"):
+                    serial_vecs.append([round(float(x), 4) for x in v])
+                else:
+                    serial_vecs.append(v if isinstance(v, list) else [])
             json.dump({
                 "facts": self.facts,
-                "vecs": [[round(float(x), 4) for x in v] for v in self.vecs],
+                "vecs": serial_vecs,
                 "access_count": self.access_count,
                 "last_access": self.last_access,
             }, f, ensure_ascii=False, separators=(",", ":"))
@@ -65,8 +94,14 @@ class Memory:
     def add(self, fact):
         if fact not in self.facts:
             self.facts.append(fact)
-            vec = self._get_model().encode(fact)
-            self.vecs.append(vec)
+            if self._semantic_ready():
+                try:
+                    vec = self._get_model().encode(fact)
+                    self.vecs.append(vec)
+                except ImportError:
+                    self.vecs.append([])
+            else:
+                self.vecs.append([])
             self.access_count.append(0)
             self.last_access.append(0)
             self._prune()
@@ -80,6 +115,16 @@ class Memory:
     def add_or_update(self, new_fact):
         if not new_fact.strip():
             return ("skipped", "空内容")
+        if not self._semantic_ready():
+            if new_fact in self.facts:
+                return ("skipped", "与已有记忆重复")
+            self.facts.append(new_fact)
+            self.vecs.append([])
+            self.access_count.append(0)
+            self.last_access.append(0)
+            self._prune()
+            self._save()
+            return ("added", None)
         new_vec = self._get_model().encode(new_fact)
         if not self.facts:
             self.facts.append(new_fact)
@@ -98,7 +143,7 @@ class Memory:
             self.facts[best_idx] = new_fact
             self.vecs[best_idx] = new_vec
             self.access_count[best_idx] = 0
-            self.last_access[best_idx] = __import__("time").time()
+            self.last_access[best_idx] = time.time()
             self._save()
             return ("updated", old_fact)
         self.facts.append(new_fact)
@@ -109,9 +154,22 @@ class Memory:
         self._save()
         return ("added", None)
 
+    def _keyword_query(self, question, top_k=3):
+        tokens = [t for t in question.lower().replace("？", " ").split() if len(t) > 1]
+        scored = []
+        for f in self.facts:
+            fl = f.lower()
+            hit = sum(1 for t in tokens if t in fl) if tokens else (1 if question in f else 0)
+            if hit or (question and question in f):
+                scored.append((hit, f))
+        scored.sort(key=lambda x: -x[0])
+        return [{"fact": f, "score": float(s)} for s, f in scored[:top_k]]
+
     def query(self, question, top_k=3):
         if not self.facts:
             return []
+        if not self._semantic_ready():
+            return self._keyword_query(question, top_k)
         try:
             q_vec = self._get_model().encode(question)
             scores = cosine_similarity([q_vec], self.vecs)[0]
@@ -120,12 +178,12 @@ class Memory:
                 if scores[idx] > 0.3:
                     results.append({"fact": self.facts[idx], "score": float(scores[idx])})
                     self.access_count[idx] += 1
-                    self.last_access[idx] = __import__("time").time()
+                    self.last_access[idx] = time.time()
             if results:
                 self._save()
             return results
         except Exception:
-            return []
+            return self._keyword_query(question, top_k)
 
     def remove(self, fact_or_query):
         if fact_or_query in self.facts:
@@ -138,29 +196,33 @@ class Memory:
                 self._save()
                 print(f"[记忆] 已删除: {f}")
                 return 1
+        if not self._semantic_ready():
+            return 0
         try:
             q_vec = self._get_model().encode(fact_or_query)
             scores = cosine_similarity([q_vec], self.vecs)[0]
             best = scores.argsort()[::-1][0]
             if scores[best] > 0.4:
+                removed = self.facts[best]
                 self._remove_at(best)
                 self._save()
-                print(f"[记忆] 已删除: {self.facts[best]}")
+                print(f"[记忆] 已删除: {removed}")
                 return 1
-        except:
+        except Exception:
             pass
         return 0
 
     def _remove_at(self, idx):
         self.facts.pop(idx)
-        self.vecs.pop(idx)
+        if idx < len(self.vecs):
+            self.vecs.pop(idx)
         self.access_count.pop(idx)
         self.last_access.pop(idx)
 
     def _prune(self):
         while len(self.facts) > self.MAX_FACTS:
             scores = []
-            now = __import__("time").time()
+            now = time.time()
             for i in range(len(self.facts)):
                 count = self.access_count[i]
                 age = now - self.last_access[i] if self.last_access[i] > 0 else 999999

@@ -65,7 +65,7 @@ TEST_CASES = [
      "max_steps": 8, "timeout": 90},
 ]
 
-SCRIPT = r"D:\\agent_learning\\repo\\react_loop.py"
+SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "react_loop.py")
 
 # 解析 --provider 参数
 _EVAL_PROVIDER = None

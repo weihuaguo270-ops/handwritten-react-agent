@@ -46,11 +46,10 @@ def _finish_with_save(answer: str = ""):
 
 MCP_CLIENTS = []
 
-DEFAULT_MCP_SERVERS = [
-    ["uvx", "mcp-server-time"],
-    # 取消注释下一行可启用文件系统 Server：
-    ["C:/Program Files/nodejs/npx.cmd", "-y", "@modelcontextprotocol/server-filesystem", "D:/agent_learning/repo"],
-]
+from react_agent.mcp_config import load_mcp_server_commands, PORTABLE_DEFAULT_MCP_SERVERS
+
+# Back-compat alias: portable defaults only (no machine-local paths).
+DEFAULT_MCP_SERVERS = PORTABLE_DEFAULT_MCP_SERVERS
 os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
 
 
@@ -520,7 +519,7 @@ def main():
             _mcp_args_list.append(_sys_argv[idx + 1].split())
         _sys_argv = _sys_argv[:idx] + _sys_argv[idx + 2:]
     if not _mcp_args_list:
-        _mcp_args_list = DEFAULT_MCP_SERVERS
+        _mcp_args_list = load_mcp_server_commands()
     for mcp_args in _mcp_args_list:
         cmd = mcp_args[0]
         args = mcp_args[1:]

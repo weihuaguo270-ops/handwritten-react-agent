@@ -2,7 +2,17 @@
 
 [![CI](https://github.com/weihuaguo270-ops/react-agent/actions/workflows/test.yml/badge.svg)](https://github.com/weihuaguo270-ops/react-agent/actions/workflows/test.yml) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-**ReAct Agent 学习实现，双实现路线** — 手写运行时用于深入理解和完全控制，LangGraph 版用于对照框架集成写法。覆盖 RAG、MCP、多 Agent 编排、执行录制回放、安全护栏与内置评测等模块。
+**ReAct Agent 学习实现，双实现路线** — 手写运行时用于深入理解和完全控制，LangGraph 版用于对照框架集成写法。覆盖 RAG、MCP、多 Agent 编排、执行录制回放、权限提示与内置评测等模块。
+
+## 范围与定位（可招聘叙事）
+
+| 是 | 不是 |
+|----|------|
+| 教学用 ReAct / Harness / Eval 串联实验台 | 生产级 Agent 运行时或安全产品 |
+| 模块广度优先（便于学习完整链路） | 单一职责、可交接的微服务切分 |
+| 离线 CI + 可选真实 LLM 冒烟 | SLA / 不可信代码隔离保证 |
+
+跨仓职责：**本仓** = Agent 执行 + capability 规则打分；**llm-eval-engine** = Process Reward / 人机校准；**trace-debugger** = 轨迹启发式复盘。共享轨迹约定见 [`schemas/harness_trajectory.schema.json`](schemas/harness_trajectory.schema.json)。
 
 ## 架构概览
 
@@ -43,7 +53,7 @@ react_agent/
 ├── tools/               工具注册 + 内置工具集
 │   ├── web_search.py    网络搜索
 │   ├── fetch_page.py    页面内容提取
-│   ├── execute_python.py Python 沙箱执行
+│   ├── execute_python.py 子进程执行 Python（超时；非安全沙箱）
 │   ├── calculator.py    计算器
 │   └── ...
 ├── context.py           上下文管理
@@ -51,13 +61,14 @@ react_agent/
 ├── cot.py               Chain-of-Thought 策略注入
 ├── tot.py               Tree-of-Thought 工具集成
 ├── prompts.py           System Prompt 构建
-├── rag.py               检索增强生成
+├── rag.py               检索增强生成（可选依赖，见下方安装）
 │
 ├── orchestrator.py      多 Agent 任务分解 + 汇总
 ├── planner.py           任务规划 + 依赖解析
 ├── mcp_client.py        MCP 协议客户端
+├── mcp_config.py        MCP 启动参数（mcp_servers.json / 环境变量）
 │
-├── eval/                评估与评分
+├── eval/                评估与评分（任务 capability 规则打分；Process Reward 见 llm-eval-engine）
 │   ├── runner.py        批量评估（支持 consistency 重复跑）
 │   ├── scorer.py        功能 4 维评分
 │   ├── capability_scorer.py  能力评估（准确率/工具/推理/一致性/幻觉）
@@ -69,10 +80,10 @@ react_agent/
 ├── harness/             执行录制与回放
 │   ├── recorder.py      完整轨迹录制
 │   ├── replay.py        逐步骤回放
-│   └── sandbox.py       隔离执行沙箱
+│   └── sandbox.py       工具子进程 + 超时（崩溃隔离，非安全边界）
 │
-├── safety/              安全与权限
-│   ├── permissions.py   四级权限系统（SAFE/NOTIFY/CONFIRM/DENY）
+├── safety/              权限提示（学习用）
+│   ├── permissions.py   工具名表四级提示（SAFE/NOTIFY/CONFIRM/DENY）
 │   ├── human_in_the_loop.py 人工审批
 │   └── trace_watch.py   执行轨迹监控
 │
@@ -94,16 +105,21 @@ react_agent/
 export LLM_PROVIDER=deepseek   # 或 openai / anthropic
 ```
 
-### 权限与沙箱
+### 权限与沙箱（学习级，非生产隔离）
 
-四级权限控制工具调用：
+工具调用采用 **名称表 + 可选参数规则** 的四级提示策略（`safety/permissions.py`）：
 
-| 等级 | 行为 | 适用场景 |
-|------|------|---------|
+| 等级 | 行为 | 适用场景（示例） |
+|------|------|------------------|
 | SAFE | 自动放行 | web_search、calculator |
-| NOTIFY | 记录 + 继续 | fetch_page（外部域名） |
+| NOTIFY | 记录后继续 | 部分读信息工具 |
 | CONFIRM | 询问用户 | write_file、execute_python |
-| DENY | 拦截 | rm -rf、敏感路径 |
+| DENY | 默认拦截 | 表内登记的破坏性工具名 |
+
+说明（诚实边界）：
+- **不是** OS / 容器级沙箱；未知工具名默认不在 DENY 表内。
+- `execute_python` / `harness/sandbox` 主要是 **子进程 + 超时**，用于隔离崩溃与卡住，**不能**当作安全边界（代码仍可访问本机网络/文件权限范围内资源）。
+- 危险 shell 字符串（如 `rm -rf`）**不会**被逐字解析拦截；请勿用生产不可信代码跑本项目的执行工具。
 
 `harness/sandbox.py` 支持 `off` / `auto` / `on`；子进程内禁止再次预热沙箱，避免递归拉起进程。
 
@@ -124,8 +140,8 @@ replay_trajectory(trajectory)
 
 ### RAG 与 MCP 集成
 
-- **RAG**：文档摄入、分块、嵌入、检索，可配置向量存储
-- **MCP Client**：连接外部 MCP 服务器，自动发现并调用工具
+- **RAG**：`pip install -e ".[rag]"` 后可用；未安装时 Agent 仍可跑，`rag_query` 会提示缺少依赖
+- **MCP**：默认仅尝试连接便携命令 `uvx mcp-server-time`。本机路径 / filesystem server 请复制 [`mcp_servers.example.json`](mcp_servers.example.json) → `mcp_servers.json`（已 gitignore），或设置 `REACT_AGENT_MCP_CONFIG` / CLI `--mcp ...`
 
 ### 多 Agent 编排
 
@@ -147,9 +163,11 @@ results = orc.execute("调研并撰写 AI 趋势报告")
 ## 快速开始
 
 ```bash
-pip install -e .
+pip install -e ".[test]"          # 核心 + pytest
+pip install -e ".[rag,test]"      # 需要本地语义检索时再装
 cp .env.example .env
 # 编辑 .env 填入 API key
+# 可选：cp mcp_servers.example.json mcp_servers.json
 
 # 运行
 python -m react_agent "法国的首都是什么？"

@@ -1,0 +1,6 @@
+{
+  "servers": [
+    ["uvx", "mcp-server-time"]
+  ],
+  "_comment": "Copy to mcp_servers.json and edit. Do not commit machine-specific absolute paths. Env override: REACT_AGENT_MCP_CONFIG=/path/to/file.json. Filesystem example (portable npx): [\"npx\", \"-y\", \"@modelcontextprotocol/server-filesystem\", \"/path/you/allow\"]"
+}

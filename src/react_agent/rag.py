@@ -15,8 +15,15 @@ RAG — 检索增强生成模块
 import json
 import os
 import glob
-import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
+
+try:
+    import numpy as np
+    from sklearn.metrics.pairwise import cosine_similarity
+    _HAS_VECTOR = True
+except ImportError:  # pragma: no cover
+    np = None
+    cosine_similarity = None
+    _HAS_VECTOR = False
 
 
 class RAG:
@@ -38,6 +45,8 @@ class RAG:
 
     def _get_model(self):
         """首次使用时加载 BGE 模型，后续复用"""
+        if not _HAS_VECTOR:
+            raise ImportError('RAG 需要: pip install -e ".[rag]"')
         if self._model is None:
             from sentence_transformers import SentenceTransformer
             self._model = SentenceTransformer('BAAI/bge-small-zh-v1.5')
@@ -205,8 +214,13 @@ class RAG:
                 data = json.load(f)
             self.chunks = data.get("chunks", [])
             self.sources = data.get("sources", [])
-            self.vecs = [np.array(v) for v in data.get("vecs", [])]
-            print(f"[RAG] 已加载 {len(self.chunks)} 个文档片段（模型懒加载）")
+            self.vecs = (
+                [np.array(v) for v in data.get("vecs", [])]
+                if _HAS_VECTOR and np is not None
+                else data.get("vecs", [])
+            )
+            mode = "语义" if _HAS_VECTOR else "无向量依赖"
+            print(f"[RAG] 已加载 {len(self.chunks)} 个文档片段（{mode}，模型懒加载）")
         except Exception:
             self.chunks = []
             self.sources = []
@@ -239,6 +253,11 @@ def rag_query(query: str, top_k: int = 3) -> str:
     Agent 工具函数：从本地文档库中检索与问题相关的知识。
     当用户问到产品文档、API 文档、项目知识库内容时使用。
     """
+    if not _HAS_VECTOR:
+        return (
+            '[RAG] 未安装语义检索依赖。请运行: pip install -e ".[rag]"\n'
+            "（核心 Agent 循环不依赖 RAG，可先用 web_search / 本地文件工具。）"
+        )
     results = RAG_INDEX.query(query, top_k=top_k)
     if not results:
         return "未在本地文档中找到相关信息"

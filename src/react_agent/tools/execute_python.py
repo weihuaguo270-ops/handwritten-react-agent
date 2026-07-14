@@ -5,16 +5,17 @@ Python 代码执行 — 让 Agent 写代码并运行
   用户: "分析数据并画图"
   Agent 写 Python 脚本 → 执行 → 看输出 → 迭代 → 最终结果
 
-安全机制：
-  - 子进程隔离执行（不阻塞主 Agent）
-  - 硬超时限制（默认 30s，防止死循环）
-  - 只暴露 stdout/stderr，不共享文件系统之外的资源
+隔离说明（学习用，非安全沙箱）：
+  - 在独立子进程中运行，带硬超时（默认 30s），避免拖死主 Agent
+  - 只回传 stdout/stderr
+  - cwd 设为临时目录，降低误改仓库文件的概率
+  - **不能**阻止恶意代码读写本机可达文件、访问网络或耗尽资源
+  - 请勿对不可信第三方代码开启本工具
 """
 import subprocess
 import sys
 import os
 import tempfile
-import json
 import time
 
 
@@ -29,10 +30,9 @@ def execute_python(code: str, timeout: int = 30) -> str:
     返回:
         stdout + stderr（或超时/错误信息）
 
-    可用包: numpy, scikit-learn, sentence-transformers, flask, requests, matplotlib
-    如需安装新包，请先尝试 pip install，若失败则提示用户手动安装。
+    可用包取决于当前解释器环境；语义检索相关包见 `pip install -e ".[rag]"`。
     """
-    # 安全限制
+    # 超时上限（软限制，非资源配额）
     timeout = min(timeout, 120)
 
     # 写入临时文件
@@ -49,7 +49,7 @@ def execute_python(code: str, timeout: int = 30) -> str:
             capture_output=True,
             text=True,
             timeout=timeout,
-            # 限制工作目录为临时目录，防止误写项目文件
+            # 工作目录为临时目录，降低误写项目文件的概率（仍非安全边界）
             cwd=os.path.dirname(tmp_path),
         )
         elapsed = time.time() - start
@@ -81,24 +81,20 @@ TOOL_DEFINITION = {
     "type": "function",
     "function": {
         "name": "execute_python",
-        "description": "执行 Python 代码并返回 stdout/stderr。"
-                       "可以写数据分析、文件处理、图表生成、Web 请求等任意 Python 脚本。"
-                       "代码会在隔离子进程中运行，有超时保护。"
-                       "可用库：numpy, scikit-learn, sentence-transformers, flask, requests, matplotlib。"
-                       "如需其他库，先 pip install 再重试。",
+        "description": (
+            "在子进程中执行 Python 代码并返回 stdout/stderr。"
+            "仅用于信任环境下的计算/脚本；不是安全沙箱。"
+        ),
         "parameters": {
             "type": "object",
             "properties": {
                 "code": {
                     "type": "string",
-                    "description": "完整的 Python 代码。"
-                                   "用 print() 输出结果，不支持 input() 交互输入。"
-                                   "注意：工作目录是临时目录，读写文件请用完整路径或 print 到 stdout。",
+                    "description": "要执行的 Python 源代码",
                 },
                 "timeout": {
                     "type": "integer",
                     "description": "超时秒数，默认 30，最大 120",
-                    "default": 30,
                 },
             },
             "required": ["code"],

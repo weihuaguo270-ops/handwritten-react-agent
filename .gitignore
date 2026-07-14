@@ -1,5 +1,6 @@
 .env
 llm_config.json
+mcp_servers.json
 __pycache__/
 *.pyc
 _test_*.py
@@ -17,6 +18,7 @@ rag_index.json
 memory.json
 llm_config.json
 .env
+mcp_servers.json
 
 # Local eval run artifacts (keep committed sample reports only if already tracked)
 src/react_agent/eval/reports/eval_20260713_*.json
