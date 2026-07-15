@@ -40,6 +40,8 @@ def run_single_case(question: str, timeout: int = 60,
     # 长跑可靠性：评测默认开 ToolGuard / 自修；步数由用例透传
     env.setdefault("REACT_AGENT_TOOL_GUARD", "1")
     env.setdefault("REACT_AGENT_SELF_REPAIR", "1")
+    # 评测默认关 MCP，避免 get_time→get_current_time 等工具名漂移造成假阴性
+    env.setdefault("REACT_AGENT_DISABLE_MCP", "1")
     if max_steps is not None:
         env["REACT_AGENT_MAX_STEPS"] = str(int(max_steps))
 

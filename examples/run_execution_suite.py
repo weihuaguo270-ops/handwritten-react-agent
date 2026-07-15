@@ -1,9 +1,9 @@
-"""跑 Execution-based 离线任务集并可选发布 docs 快照。
+"""跑 Execution 任务集（offline_tools / agent）并可选发布 docs 快照。
 
 用法：
   python examples/run_execution_suite.py
-  python examples/run_execution_suite.py --publish
-  python examples/run_execution_suite.py --stem execution_snapshot_20260715
+  python examples/run_execution_suite.py --modes agent --publish
+  python examples/run_execution_suite.py --modes offline_tools,agent --stem execution_all_YYYYMMDD
 """
 
 from __future__ import annotations
@@ -17,6 +17,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+
+# 加载 .env（API Key）
+try:
+    from react_agent.llm import _load_dotenv
+    _load_dotenv()
+except Exception:
+    pass
 
 from react_agent.eval.execution_scorer import (  # noqa: E402
     report_to_markdown,
@@ -40,36 +47,43 @@ def _git_sha() -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Execution-based offline suite")
+    parser = argparse.ArgumentParser(description="Execution suite (offline + agent)")
+    parser.add_argument("--dataset", default=None)
     parser.add_argument(
-        "--dataset",
-        default=None,
-        help="execution_dataset.json 路径（默认内置）",
+        "--modes",
+        default="offline_tools",
+        help="逗号分隔: offline_tools,agent（默认仅 offline_tools）",
     )
-    parser.add_argument(
-        "--publish",
-        action="store_true",
-        help="写入 docs/*.md + docs/snapshots/*.json",
-    )
-    parser.add_argument(
-        "--stem",
-        default=None,
-        help="快照文件名 stem（默认 execution_snapshot_YYYYMMDD）",
-    )
+    parser.add_argument("--publish", action="store_true")
+    parser.add_argument("--stem", default=None)
     args = parser.parse_args()
 
-    report = run_execution_suite(args.dataset)
+    modes = [m.strip() for m in args.modes.split(",") if m.strip()]
+    if "agent" in modes:
+        import os
+        os.environ.setdefault("REACT_AGENT_SKIP_RAG", "1")
+        os.environ.setdefault("REACT_AGENT_SANDBOX_PREWARM", "0")
+        os.environ.setdefault("REACT_AGENT_DISABLE_MCP", "1")
+        os.environ.setdefault("LLM_PROVIDER", "deepseek")
+        if not (os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")):
+            print("ERROR: agent 模式需要 DEEPSEEK_API_KEY 或 OPENAI_API_KEY", file=sys.stderr)
+            return 2
+
+    report = run_execution_suite(args.dataset, modes=modes)
     s = report["summary"]
     print("=" * 55)
-    print("  Execution Suite (offline_tools)")
+    print(f"  Execution Suite modes={modes}")
     print(f"  {s['passed']}/{s['total']}  pass_rate={s['pass_rate']}%")
     print("=" * 55)
     for r in report["results"]:
         icon = "OK" if r["passed"] else ("SKIP" if r.get("skipped") else "FAIL")
-        print(f"  [{icon}] {r['id']}: {r.get('reason', '')}")
+        print(f"  [{icon}] {r['id']} ({r.get('mode')}): {r.get('reason', '')}")
 
     if args.publish:
-        stem = args.stem or f"execution_snapshot_{datetime.now().strftime('%Y%m%d')}"
+        default_stem = "execution_snapshot_" + datetime.now().strftime("%Y%m%d")
+        if modes == ["agent"]:
+            default_stem = "execution_agent_snapshot_" + datetime.now().strftime("%Y%m%d")
+        stem = args.stem or default_stem
         docs = ROOT / "docs"
         snap_dir = docs / "snapshots"
         docs.mkdir(exist_ok=True)
@@ -78,7 +92,9 @@ def main() -> int:
         md_path = docs / f"{stem}.md"
         report["meta"] = {
             "git": _git_sha(),
-            "reproduce_cmd": "python examples/run_execution_suite.py --publish",
+            "reproduce_cmd": (
+                f"python examples/run_execution_suite.py --modes {','.join(modes)} --publish"
+            ),
         }
         json_path.write_text(
             json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -86,10 +102,9 @@ def main() -> int:
         notes = [
             f"git: `{_git_sha()}`",
             f"archived_json: `docs/snapshots/{json_path.name}`",
-            "reproduce: `python examples/run_execution_suite.py --publish`",
+            f"reproduce: `python examples/run_execution_suite.py --modes {','.join(modes)} --publish`",
         ]
         md = report_to_markdown(report, title=f"Execution 公开快照（{stem}）")
-        # inject notes after title block
         parts = md.split("\n", 2)
         extra = "\n".join(f"- {n}" for n in notes) + "\n"
         if len(parts) >= 3:
@@ -99,7 +114,7 @@ def main() -> int:
         md_path.write_text(md, encoding="utf-8")
         print(f"\nPublished:\n  {md_path}\n  {json_path}")
 
-    return 0 if s["failed"] == 0 else 1
+    return 0 if s.get("failed", 0) == 0 else 1
 
 
 if __name__ == "__main__":

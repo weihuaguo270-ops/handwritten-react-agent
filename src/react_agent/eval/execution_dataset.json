@@ -116,5 +116,71 @@
         "expect_contains": "56"
       }
     ]
+  },
+  {
+    "id": "agent_calc_17x19",
+    "name": "Agent: compute 17*19 with calculator",
+    "tags": ["execution", "agent", "calculator"],
+    "mode": "agent",
+    "question": "请用 calculator 工具计算 17*19，给出数字答案。",
+    "expected_tools": ["calculator"],
+    "expected_answer": "323",
+    "max_steps": 5,
+    "timeout": 90
+  },
+  {
+    "id": "agent_calc_100_minus_37",
+    "name": "Agent: compute 100-37",
+    "tags": ["execution", "agent", "calculator"],
+    "mode": "agent",
+    "question": "请调用 calculator 计算 100 - 37，只关心数值结果。",
+    "expected_tools": ["calculator"],
+    "expected_answer": "63",
+    "max_steps": 5,
+    "timeout": 90
+  },
+  {
+    "id": "agent_get_time",
+    "name": "Agent: get current time via tool",
+    "tags": ["execution", "agent", "get_time"],
+    "mode": "agent",
+    "question": "请调用 get_time 工具查询当前时间，并在答案里写出日期（YYYY-MM-DD 格式即可）。",
+    "expected_tools": ["get_time", "get_current_time"],
+    "must_contain_any": ["2026"],
+    "max_steps": 5,
+    "timeout": 90
+  },
+  {
+    "id": "agent_py_sum_1_to_5",
+    "name": "Agent: execute_python sum 1..5",
+    "tags": ["execution", "agent", "execute_python"],
+    "mode": "agent",
+    "question": "请用 execute_python 工具写代码打印 1+2+3+4+5 的结果，并给出最终数字。",
+    "expected_tools": ["execute_python"],
+    "expected_answer": "15",
+    "max_steps": 6,
+    "timeout": 120
+  },
+  {
+    "id": "agent_calc_8x7",
+    "name": "Agent: 8*7 via calculator",
+    "tags": ["execution", "agent", "calculator"],
+    "mode": "agent",
+    "question": "用 calculator 算一下 8 乘以 7 等于多少？",
+    "expected_tools": ["calculator"],
+    "expected_answer": "56",
+    "max_steps": 5,
+    "timeout": 90
+  },
+  {
+    "id": "agent_py_factorial_5",
+    "name": "Agent: factorial 5 via python",
+    "tags": ["execution", "agent", "execute_python"],
+    "mode": "agent",
+    "question": "请用 execute_python 计算 5 的阶乘（5!），输出最终数字。",
+    "expected_tools": ["execute_python"],
+    "expected_answer": "120",
+    "max_steps": 6,
+    "timeout": 120
   }
 ]

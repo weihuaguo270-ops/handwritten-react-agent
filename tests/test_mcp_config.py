@@ -29,6 +29,7 @@ def test_load_from_json(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     monkeypatch.delenv("REACT_AGENT_MCP_CONFIG", raising=False)
+    monkeypatch.delenv("REACT_AGENT_DISABLE_MCP", raising=False)
     monkeypatch.chdir(tmp_path)
     # Also clear accidental project-root hits by pointing env explicitly
     monkeypatch.setenv("REACT_AGENT_MCP_CONFIG", str(cfg))
@@ -39,6 +40,12 @@ def test_load_from_json(tmp_path, monkeypatch):
 
 def test_default_fallback_when_missing(monkeypatch, tmp_path):
     monkeypatch.delenv("REACT_AGENT_MCP_CONFIG", raising=False)
+    monkeypatch.delenv("REACT_AGENT_DISABLE_MCP", raising=False)
     monkeypatch.chdir(tmp_path)
     cmds = load_mcp_server_commands(config_path=str(tmp_path / "missing.json"))
     assert cmds == PORTABLE_DEFAULT_MCP_SERVERS
+
+
+def test_disable_mcp_env(monkeypatch):
+    monkeypatch.setenv("REACT_AGENT_DISABLE_MCP", "1")
+    assert load_mcp_server_commands() == []

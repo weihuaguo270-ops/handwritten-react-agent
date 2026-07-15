@@ -38,7 +38,14 @@ def load_mcp_server_commands(
 
     JSON schema::
         {"servers": [["uvx", "mcp-server-time"], ["npx", "-y", "..."]]}
+
+    Set ``REACT_AGENT_DISABLE_MCP=1`` to skip all MCP (useful for eval determinism).
     """
+    if os.environ.get("REACT_AGENT_DISABLE_MCP", "").strip().lower() in (
+        "1", "true", "yes", "on",
+    ):
+        return []
+
     candidates = [config_path] if config_path else []
     candidates.extend(_candidate_config_paths())
 

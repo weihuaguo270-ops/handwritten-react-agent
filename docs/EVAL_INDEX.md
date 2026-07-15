@@ -10,6 +10,8 @@
 | [eval_report_20260713.md](./eval_report_20260713.md) | default 功能集 26 条 | 23/26（88%） | 人工整理（见文内失败分析） |
 | [capability_newcases_20260713.md](./capability_newcases_20260713.md) | capability 扩容 6 条 | **5/6（83%）** | [snapshots/…](./snapshots/capability_newcases_20260713.json) |
 | [execution_snapshot_20260715.md](./execution_snapshot_20260715.md) | execution 离线工具集 8 条 | **8/8（100%）** | [snapshots/…](./snapshots/execution_snapshot_20260715.json) |
+| [execution_agent_snapshot_20260715.md](./execution_agent_snapshot_20260715.md) | execution **agent** 端到端 6 条 | **6/6（100%）** | DeepSeek；`DISABLE_MCP=1`；[归档](./snapshots/execution_agent_snapshot_20260715.json) |
+| [reliability_snapshot_20260715.md](./reliability_snapshot_20260715.md) | ToolGuard/自修注入对照 4 场景 | **4/4（100%）** | [snapshots/…](./snapshots/reliability_snapshot_20260715.json) |
 
 当前 `capability_dataset.json` 已扩至 **24** 条（原 18 + 新 6）。全量重跑：
 
@@ -17,18 +19,27 @@
 python examples/publish_eval_snapshot.py --run capability --stem capability_snapshot_YYYYMMDD
 ```
 
-## Execution 成功率（不经 LLM）
+## Execution 成功率
 
 ```bash
+# 工具层（offline，CI 默认）
 python examples/run_execution_suite.py
-python examples/run_execution_suite.py --publish
+# 端到端 Agent（需 API Key；评测默认关 MCP 以提高确定性）
+set REACT_AGENT_DISABLE_MCP=1
+python examples/run_execution_suite.py --modes agent --publish
 ```
 
-说明：execution 测的是 **工具执行验收**，不是端到端 Agent 规划通过率。
+说明：`offline_tools` ≠ `agent`；前者测工具，后者测 LLM 规划+执行。
+
+## Harness 可靠性对照
+
+```bash
+python examples/run_reliability_harness.py --publish
+```
 
 ## 失败归因周报
 
-轨迹失败分布见姊妹仓 [trace-debugger/docs/FAILURE_INDEX.md](https://github.com/weihuaguo270-ops/trace-debugger/blob/master/docs/FAILURE_INDEX.md)。
+轨迹失败分布见姊妹仓 [trace-debugger/docs/FAILURE_INDEX.md](https://github.com/weihuaguo270-ops/trace-debugger/blob/master/docs/FAILURE_INDEX.md)（含 **真实 100 条**轨迹扫描）。
 
 ## 一键发布（推荐）
 

@@ -53,6 +53,10 @@ jobs:
         set -e
         export REACT_AGENT_SKIP_RAG=1
         python examples/run_execution_suite.py
+    - name: Reliability harness (injected)
+      run: |
+        export REACT_AGENT_SKIP_RAG=1
+        python examples/run_reliability_harness.py
 
   integration:
     runs-on: ubuntu-latest

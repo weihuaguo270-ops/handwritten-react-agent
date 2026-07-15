@@ -1,0 +1,101 @@
+{
+  "report_id": "reliability_20260715_080432",
+  "timestamp": "2026-07-15T08:04:32.675041+00:00",
+  "kind": "harness_reliability_injected",
+  "summary": {
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "pass_rate": 100.0
+  },
+  "scenarios": [
+    {
+      "id": "flaky_timeout_recover",
+      "description": "timeout 可恢复：前 2 次失败，第 3 次成功",
+      "metric": "recovered",
+      "guard_on": {
+        "recovered": true,
+        "calls": 3,
+        "output": "recovered_ok",
+        "error": null
+      },
+      "guard_off": {
+        "recovered": false,
+        "calls": 1,
+        "output": "",
+        "error": "timeout"
+      },
+      "delta": {
+        "on_better": true,
+        "on_calls": 3,
+        "off_calls": 1
+      },
+      "passed": true
+    },
+    {
+      "id": "hard_timeout_block",
+      "description": "ToolGuard ON 时对慢工具做超时截断",
+      "metric": "blocked_or_timed_out",
+      "guard_on": {
+        "blocked_or_timed_out": true,
+        "elapsed_s": 2.5,
+        "output": "{\"error\": \"\\u8d85\\u65f6 (1s)\", \"blocked\": false, \"retry_exhausted\": true}"
+      },
+      "guard_off": {
+        "blocked_or_timed_out": false,
+        "elapsed_s": 0.25,
+        "output": "too_late",
+        "note": "OFF 路径用短睡代理，表示无超时截断会返回结果"
+      },
+      "delta": {
+        "on_blocks": true,
+        "off_returns_result": true
+      },
+      "passed": true
+    },
+    {
+      "id": "self_repair_attach",
+      "description": "失败结果附着自修提示；正常结果不误触发",
+      "metric": "attach_precision",
+      "guard_on": {
+        "error_detected": true,
+        "hint_attached": true,
+        "clean_not_flagged": true,
+        "passed": true
+      },
+      "guard_off": {
+        "note": "关闭自修时仅透传原始错误，无提示层（逻辑上 attach=False）",
+        "hint_attached": false,
+        "passed": true
+      },
+      "delta": {
+        "self_repair_available": true
+      },
+      "passed": true
+    },
+    {
+      "id": "rate_limit_guard",
+      "description": "1 分钟内同工具超限调用被阻断",
+      "metric": "third_call_blocked",
+      "guard_on": {
+        "first": "ok",
+        "second": "ok",
+        "third": "{\"error\": \"工具 web_search 调用频繁\", \"blocked\": true}",
+        "blocked": true,
+        "passed": true
+      },
+      "guard_off": {
+        "note": "无 Guard 时三次均可成功（此处不实际调用）",
+        "would_block": false
+      },
+      "delta": {
+        "guard_blocks_burst": true
+      },
+      "passed": true
+    }
+  ],
+  "meta": {
+    "git": "3cd5e21",
+    "note": "注入故障对照，非线上长跑 SLA；证明 ToolGuard/自修机制可测，不等于全链路 Agent 稳定性"
+  }
+}

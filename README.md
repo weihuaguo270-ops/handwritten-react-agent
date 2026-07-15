@@ -221,18 +221,23 @@ python examples/publish_eval_snapshot.py --run capability   # 需 API Key
 | [扩容新用例](docs/capability_newcases_20260713.md) | 2026-07-13 | **5/6（83%）** | 新增 6 条；1 例未调 calculator（诚实失败） |
 | [功能向整理](docs/eval_report_20260713.md) | 2026-07-13 | **23/26（88%）** | DeepSeek；3 例角色关键词检测过严 |
 | [Execution 离线工具集](docs/execution_snapshot_20260715.md) | 2026-07-15 | **8/8（100%）** | 不经 LLM；工具执行验收 |
+| [Execution Agent 端到端](docs/execution_agent_snapshot_20260715.md) | 2026-07-15 | **6/6（100%）** | DeepSeek live；`DISABLE_MCP=1` |
+| [Harness 可靠性对照](docs/reliability_snapshot_20260715.md) | 2026-07-15 | **4/4（100%）** | ToolGuard/自修注入故障 |
 | Capability 集规模 | 2026-07-13 | **24 条** | 原 18 + 新 6；索引见 [EVAL_INDEX](docs/EVAL_INDEX.md) |
 
-Execution 复跑：
+Execution / 可靠性复跑：
 
 ```bash
 python examples/run_execution_suite.py --publish
+set REACT_AGENT_DISABLE_MCP=1
+python examples/run_execution_suite.py --modes agent --publish
+python examples/run_reliability_harness.py --publish
 ```
 
-Harness 长跑默认策略（可关）：`REACT_AGENT_TOOL_GUARD=1`（超时/重试/熔断）、`REACT_AGENT_SELF_REPAIR=1`（工具失败自修提示）、`REACT_AGENT_MAX_STEPS` / `--max-steps`。
+Harness 长跑默认策略（可关）：`REACT_AGENT_TOOL_GUARD=1`、`REACT_AGENT_SELF_REPAIR=1`、`REACT_AGENT_MAX_STEPS` / `--max-steps`；评测默认 `REACT_AGENT_DISABLE_MCP=1`。
 
 与 [llm-eval-engine](https://github.com/weihuaguo270-ops/llm-eval-engine) 的 Process Reward / 人机校准打通见 `examples/agent_to_eval.py`；校准快照在 eval-engine 的 `docs/calibration_snapshot_*.md`。  
-失败归因周报见 [trace-debugger docs](https://github.com/weihuaguo270-ops/trace-debugger/blob/master/docs/FAILURE_INDEX.md)。
+失败归因周报见 [trace-debugger docs](https://github.com/weihuaguo270-ops/trace-debugger/blob/master/docs/FAILURE_INDEX.md)（含真实 100 条轨迹分布）。
 
 ### Harness 轨迹 Schema + 闭环 Demo
 
