@@ -7,7 +7,7 @@
 | **能不能干成** | 工具 / Agent 任务成功率 | [execution offline](./execution_snapshot_20260715.md) · [agent v3](./execution_agent_snapshot_20260716_v3.md) | offline **12/12**；agent **36/36**（易8/中12/难16） |
 | **坏了能不能撑住** | Guard/自修是否有效 | [注入对照](./reliability_snapshot_20260715.md) · [live v2](./reliability_live_live_20260716_v2.md) | 注入 **4/4**；live flaky **n=20**：ON/OFF 皆 100%，**error_obs 0 vs 3.1**，**tool_calls 1.0 vs 2.25** |
 | **坏在哪** | 轨迹失败分布 | [tdebug 真实 100 条](https://github.com/weihuaguo270-ops/trace-debugger/blob/master/docs/tdebug_failure_real_20260715.md) · [飞轮闭环](./flywheel_closed_loop_20260716.md) | 同批重扫：`llm_offtrack` **6→1**；duplicate Harness 已拦 |
-| **评得清不清** | Judge 与人标一致吗 | [κ offline](https://github.com/weihuaguo270-ops/llm-eval-engine/blob/master/docs/calibration_snapshot_20260716.md) · [κ live](https://github.com/weihuaguo270-ops/llm-eval-engine/blob/master/docs/calibration_snapshot_20260716_live.md) | offline κ≈**0.90**；live（DeepSeek）κ≈**0.68**（n=28） |
+| **评得清不清** | Judge 与人标一致吗 | [κ offline v3](https://github.com/weihuaguo270-ops/llm-eval-engine/blob/master/docs/calibration_snapshot_20260716_offline.md) · [κ live](https://github.com/weihuaguo270-ops/llm-eval-engine/blob/master/docs/calibration_snapshot_20260716_live.md) · [怎么读](https://github.com/weihuaguo270-ops/llm-eval-engine/blob/master/docs/METRICS_TRUST.md) | **held_out** offline κ=**1.0**（n=11，冻结分）；全量 offline κ≈**0.90** CI[0.75,1.0]；live 全量 κ≈**0.68** |
 
 ## 怎么读（简历叙事）
 
@@ -37,5 +37,6 @@ python examples/run_flywheel_closed_loop.py --publish
 
 - 样本量仍属学习级；live 绑定模型与日期  
 - flaky live 使用注入超时，证明机制有效，不等于生产故障率  
-- κ：offline ≈0.90（冻结分）；live DeepSeek ≈0.68（n=28）；勿与生产 SLA 等同  
+- κ：**分栏引用** — held_out（协议冻结后）优先于全量 offline；live 与 offline 勿混谈；单人标注、第二标注者 pending  
+- execution 报告含 Wilson 95% CI 与 tool/final 分项率，勿只甩「36/36」  
 - 飞轮 `llm_offtrack` 下降含假阳性修复；`duplicate` 历史 traj 不变，需新跑才体现 Harness 拦截

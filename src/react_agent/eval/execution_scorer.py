@@ -27,6 +27,21 @@ DEFAULT_EXECUTION_DATASET = os.path.join(_EVAL_DIR, "execution_dataset.json")
 AgentRunner = Callable[..., tuple]  # (stdout, traj, exit_code, duration)
 
 
+def wilson_ci(successes: int, n: int, z: float = 1.96) -> dict[str, float]:
+    """Wilson score interval for a binomial proportion (percent scale)."""
+    if n <= 0:
+        return {"low": 0.0, "high": 0.0, "point": 0.0}
+    p = successes / n
+    denom = 1 + z * z / n
+    center = (p + z * z / (2 * n)) / denom
+    half = (z / denom) * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5)
+    return {
+        "point": round(100.0 * p, 1),
+        "low": round(100.0 * max(0.0, center - half), 1),
+        "high": round(100.0 * min(1.0, center + half), 1),
+    }
+
+
 def load_execution_dataset(path: Optional[str] = None) -> list[dict]:
     filepath = path or DEFAULT_EXECUTION_DATASET
     with open(filepath, encoding="utf-8") as f:
@@ -414,6 +429,14 @@ def run_execution_suite(
                 round(100.0 * final_ok_n / n_agent, 1) if n_agent else None
             ),
             "agent_n": n_agent,
+            "pass_rate_wilson_95": wilson_ci(passed, total),
+            "final_answer_rate_wilson_95": (
+                wilson_ci(final_ok_n, n_agent) if n_agent else None
+            ),
+            "honesty": (
+                "单点通过率绑定模型/日期/提示；请同时看 Wilson 95% CI 与分项 "
+                "tool_success_rate / final_answer_rate"
+            ),
         },
         "by_mode": _rate_map(by_mode),
         "by_difficulty": _rate_map(by_diff),
