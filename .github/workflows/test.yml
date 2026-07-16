@@ -48,6 +48,11 @@ jobs:
       run: python test_all.py
     - name: Pytest (offline)
       run: pytest tests/ -q --ignore=tests/test_real_llm.py
+    - name: Coverage (3.11)
+      if: matrix.python-version == '3.11'
+      run: |
+        pip install pytest-cov
+        pytest tests/ -q --ignore=tests/test_real_llm.py --cov=react_agent --cov-report=term-missing --cov-fail-under=35
     - name: Execution suite (offline tools)
       run: |
         set -e
@@ -101,6 +106,51 @@ jobs:
       run: |
         Remove-Item Env:PYTHONIOENCODING -ErrorAction SilentlyContinue
         python examples/harness_closed_loop.py --fixture
+
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+    - run: pip install -e ".[test]" mypy
+    - run: >
+        mypy src/react_agent
+        --ignore-missing-imports
+        --allow-untyped-defs
+        --allow-incomplete-defs
+        --exclude '(tot|planner|orchestrator|rag|mcp_client|dashboard|intent)/?'
+        --disable-error-code=arg-type
+        --disable-error-code=assignment
+        --disable-error-code=attr-defined
+        --disable-error-code=return-value
+        --disable-error-code=union-attr
+        --disable-error-code=var-annotated
+        --disable-error-code=misc
+        --disable-error-code=operator
+        --disable-error-code=call-overload
+        --disable-error-code=name-defined
+        --disable-error-code=index
+        --disable-error-code=has-type
+        --disable-error-code=valid-type
+        --disable-error-code=call-arg
+
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+    - name: pip-audit in clean venv
+      run: |
+        python -m venv .audit-venv
+        .audit-venv/bin/pip install -U pip
+        .audit-venv/bin/pip install -e ".[test]" pip-audit
+        .audit-venv/bin/pip-audit
 
   integration:
     runs-on: ubuntu-latest

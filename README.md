@@ -1,98 +1,58 @@
-# ReAct Agent Framework
+# ReAct Agent
 
-[![CI](https://github.com/weihuaguo270-ops/react-agent/actions/workflows/test.yml/badge.svg)](https://github.com/weihuaguo270-ops/react-agent/actions/workflows/test.yml) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![CI](https://github.com/weihuaguo270-ops/react-agent/actions/workflows/test.yml/badge.svg)](https://github.com/weihuaguo270-ops/react-agent/actions/workflows/test.yml) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![learning](https://img.shields.io/badge/status-learning%20%2F%20not%20production-lightgrey)](docs/EXPERIMENTAL.md)
 
-**ReAct Agent 学习实现，双实现路线** — 手写运行时用于深入理解和完全控制，LangGraph 版用于对照框架集成写法。覆盖 RAG、MCP、多 Agent 编排、执行录制回放、权限提示与内置评测等模块。
+**手写 ReAct 学习运行时** — 透明循环、工具注册、轨迹录制/回放（Format B）、学习级权限提示与 ToolGuard。  
+可选实验（RAG / MCP / 多 Agent / LangGraph）与评测证据见下方链接，**不进默认产品叙事**。
 
-## 范围与定位（可招聘叙事）
+## 范围与定位
 
 | 是 | 不是 |
 |----|------|
-| 教学用 ReAct / Harness / Eval 串联实验台 | 生产级 Agent 运行时或安全产品 |
-| 模块广度优先（便于学习完整链路） | 单一职责、可交接的微服务切分 |
-| 离线 CI + 可选真实 LLM 冒烟 | SLA / 不可信代码隔离保证 |
+| 教学用 ReAct + Harness 轨迹 | 生产级 Agent 运行时或安全产品 |
+| Core 路径可本地跑通、可测 | 微服务切分 / SLA |
+| 离线 CI + 可选真实 LLM 冒烟 | 不可信代码隔离保证 |
 
-跨仓职责：**本仓** = Agent 执行 + capability 规则打分；**llm-eval-engine** = Process Reward / 人机校准；**trace-debugger** = 轨迹启发式复盘。共享轨迹约定见 [`schemas/harness_trajectory.schema.json`](schemas/harness_trajectory.schema.json)。
+跨仓：**本仓 Core** = 执行 + capability 规则打分；**llm-eval-engine** = Process Reward / 人机校准；**trace-debugger** = 轨迹启发式复盘。共享约定见 [`schemas/harness_trajectory.schema.json`](schemas/harness_trajectory.schema.json)。
+
+求职/证据地图（与运行时功能分开）：[`docs/P0_EVIDENCE_MAP.md`](docs/P0_EVIDENCE_MAP.md)。
 
 ## 架构概览
 
-本仓库提供两种互补的 ReAct Agent 实现（教学/实验用途）：
+| 维度 | Core（`src/react_agent/`） | 对照实验 |
+|------|---------------------------|----------|
+| **入口** | `react_loop()` | LangGraph：`experiments/langgraph/` |
+| **依赖** | 标准库 + LLM API | LangChain / LangGraph（可选） |
+| **目标** | 完全透明、可录轨迹 | 框架编排对照（无严格等价测试） |
 
-| 维度 | 手写版（`src/`） | LangGraph 版（`experiments/langgraph/`） |
-|------|-----------------|----------------------------------------|
-| **依赖** | Python 标准库 + LLM API | LangChain + LangGraph |
-| **目标** | 完全透明，每行代码可控 | 对照框架图编排写法 |
-| **状态管理** | 手动管理 | LangGraph 内置 graph 状态 |
-
-### 执行流程
+### 执行流程（Core）
 
 ```
-query 输入
-  │
-  ├── 普通入口 → react_loop()
-  │     │
-  │     ├── Step 0: 构建 system prompt（base + 角色注入 + CoT 策略）
-  │     ├── Step 1: LLM 调用 → thought/action
-  │     ├── Step 2: 工具执行（权限检查）
-  │     ├── Step 3: 观察结果集成
-  │     └── 循环直至输出最终答案
-  │
-  └── Orchestrator 入口
-        ├── plan() → 任务分解（带依赖追踪）
-        ├── run_worker() → 每个子任务独立运行 react_loop()
-        └── synthesize() → 汇总结果
+query → react_loop()
+          ├── system prompt（角色 / CoT）
+          ├── LLM → thought / action
+          ├── 工具执行（权限提示 + ToolGuard）
+          └── 观测回填 → 直至最终答案
 ```
+
+多 Agent / MCP / RAG：**可选**，见 [`docs/EXPERIMENTAL.md`](docs/EXPERIMENTAL.md)。
 
 ### 模块清单
 
 ```
-react_agent/
-│
-├── react_loop.py        核心 ReAct 循环（thought → action → observation）
-├── llm.py               LLM Provider 抽象（多 provider 切换）
-├── tools/               工具注册 + 内置工具集
-│   ├── web_search.py    网络搜索
-│   ├── fetch_page.py    页面内容提取
-│   ├── execute_python.py 子进程执行 Python（超时；非安全沙箱）
-│   ├── calculator.py    计算器
-│   └── ...
-├── context.py           上下文管理
-├── memory.py            对话记忆
-├── cot.py               Chain-of-Thought 策略注入
-├── tot.py               Tree-of-Thought 工具集成
-├── prompts.py           System Prompt 构建
-├── rag.py               检索增强生成（可选依赖，见下方安装）
-│
-├── orchestrator.py      多 Agent 任务分解 + 汇总
-├── planner.py           任务规划 + 依赖解析
-├── mcp_client.py        MCP 协议客户端
-├── mcp_config.py        MCP 启动参数（mcp_servers.json / 环境变量）
-│
-├── eval/                评估与评分（任务 capability 规则打分；Process Reward 见 llm-eval-engine）
-│   ├── runner.py        批量评估（支持 consistency 重复跑）
-│   ├── scorer.py        功能 4 维评分
-│   ├── capability_scorer.py  能力评估（准确率/工具/推理/一致性/幻觉）
-│   ├── dataset.py       数据集加载
-│   ├── dataset.json     功能验证集
-│   ├── capability_dataset.json  能力评估集
-│   └── report.py        报告生成（含 by_capability）
-│
-├── harness/             执行录制与回放
-│   ├── recorder.py      完整轨迹录制
-│   ├── replay.py        逐步骤回放
-│   └── sandbox.py       工具子进程 + 超时（崩溃隔离，非安全边界）
-│
-├── safety/              权限提示（学习用）
-│   ├── permissions.py   工具名表四级提示（SAFE/NOTIFY/CONFIRM/DENY）
-│   ├── human_in_the_loop.py 人工审批
-│   └── trace_watch.py   执行轨迹监控
-│
-├── intent/              任务分类
-│   └── classifier.py    意图识别（功能测试 vs 生成式任务）
-│
-├── dashboard/           实时执行可视化（server.py + index.html）
-│
-└── resilience.py        错误处理与重试
+react_agent/                    # CORE
+├── react_loop.py               ReAct 循环
+├── llm.py / prompts.py / cot.py
+├── tools/                      默认工具（计算/搜索/抓取/摘要/时间/执行）
+├── context.py / memory.py
+├── harness/                    录制 · 回放 · Schema · 沙箱超时
+├── safety/                     学习级权限提示 + HITL
+├── resilience.py               ToolGuard（超时/重试；非安全边界）
+└── eval/                       EVAL-ONLY：capability 规则打分
+
+# EXPERIMENTAL（默认不注册进工具表）— 见 docs/EXPERIMENTAL.md
+#   rag.py · mcp_*.py · orchestrator.py · tot.py · dashboard/
+#   experiments/langgraph/
 ```
 
 ## 核心功能
@@ -138,116 +98,41 @@ from react_agent.harness.replay import replay_trajectory
 replay_trajectory(trajectory)
 ```
 
-### RAG 与 MCP 集成
+### RAG / MCP / 多 Agent（实验）
 
-- **RAG**：`pip install -e ".[rag]"` 后可用；未安装时 Agent 仍可跑，`rag_query` 会提示缺少依赖
-- **MCP**：默认仅尝试连接便携命令 `uvx mcp-server-time`。本机路径 / filesystem server 请复制 [`mcp_servers.example.json`](mcp_servers.example.json) → `mcp_servers.json`（已 gitignore），或设置 `REACT_AGENT_MCP_CONFIG` / CLI `--mcp ...`
+默认关闭。详见 [`docs/EXPERIMENTAL.md`](docs/EXPERIMENTAL.md)。
 
-### 多 Agent 编排
-
-复杂任务自动分解为带依赖的子任务：
-
-```python
-from react_agent.orchestrator import Orchestrator
-
-orc = Orchestrator()
-# execute 内部会先 plan（分解子任务与依赖），再按层级执行并 synthesize
-results = orc.execute("调研并撰写 AI 趋势报告")
-# 也可单独查看计划：orc.plan("调研并撰写 AI 趋势报告")
+```bash
+set REACT_AGENT_EXPERIMENTAL_TOOLS=1   # 注册 rag_query / tot / dashboard
+pip install -e ".[rag]"                # 语义检索依赖
+# MCP：cp mcp_servers.example.json mcp_servers.json 或 --mcp ...
 ```
 
-## LangGraph 版（`experiments/langgraph/`）
+## LangGraph 对照（`experiments/langgraph/`）
 
-基于 LangChain/LangGraph 的图计算实验实现，用于对照「手写循环 vs 框架编排」。覆盖可配置 Agent 图、上下文管理、MCP 工具、RAG pipeline、执行录制、记忆管理、多 Agent 编排；与手写版能力接近，但未做严格等价性测试。
+框架图编排的**对照实验**；未做与手写版的严格等价性测试，不保证行为一致。
 
 ## 快速开始
 
 ```bash
-pip install -e ".[test]"          # 核心 + pytest
-pip install -e ".[rag,test]"      # 需要本地语义检索时再装
+pip install -e ".[test]"
 cp .env.example .env
-# 编辑 .env 填入 API key
-# 可选：cp mcp_servers.example.json mcp_servers.json
-
-# 运行
 python -m react_agent "法国的首都是什么？"
-
-# 启动 Web 面板
-python -m react_agent.dashboard.server
 ```
 
-## 评测
+Web 面板（实验）：`REACT_AGENT_EXPERIMENTAL_TOOLS=1` 后 `python -m react_agent.dashboard.server`。
 
-功能验证（工具/关键词/步数）与能力评估（规则打分）共用 `EvalRunner`：
+## 评测（EVAL-ONLY）
 
-| 指标 | capability | 含义 |
-|------|------------|------|
-| 准确率 | `accuracy` | 最终答案命中 `expected_answer` |
-| 工具选择 | `tool_selection` | 工具精确率 / 召回率 / F1 |
-| 多步推理 | `reasoning` | 检查点 + 最终答案 |
-| 一致性 | `consistency` | 同题多次运行答案一致率 |
-| 幻觉率 | `hallucination` | 禁止错误主张 + 可选 grounded |
+能力规则打分与公开快照索引：[`docs/EVAL_INDEX.md`](docs/EVAL_INDEX.md) · 证据地图：[`docs/P0_EVIDENCE_MAP.md`](docs/P0_EVIDENCE_MAP.md)。
 
 ```bash
-# 功能验证集
-python -m react_agent.eval
-
-# 能力评估全集
 python -m react_agent.eval --dataset capability
-
-# 只跑某一能力维度
-python -m react_agent.eval --capability accuracy
-python -m react_agent.eval --capability tool_selection
-
-# 查看历史报告
-python -m react_agent.eval --list
-```
-
-报告保存在 `src/react_agent/eval/reports/`（本地跑批产物，部分日期文件被 gitignore）。  
-**对外公开**请用发布脚本写入 `docs/` + `docs/snapshots/`：
-
-```bash
-python examples/publish_eval_snapshot.py --from-report <eval_*.json>
-python examples/publish_eval_snapshot.py --run capability   # 需 API Key
-```
-
-索引见 [docs/EVAL_INDEX.md](docs/EVAL_INDEX.md)。
-
-### 最近一次公开结果（学习用途，样本量有限）
-
-| 报告 | 日期 | 结果 | 说明 |
-|------|------|------|------|
-| [Capability 快照](docs/capability_snapshot_20260713.md) | 2026-07-13 | **18/18（100%）** | 规则打分五维；[归档 JSON](docs/snapshots/capability_snapshot_20260713.json) |
-| [扩容新用例](docs/capability_newcases_20260713.md) | 2026-07-13 | **5/6（83%）** | 新增 6 条；1 例未调 calculator（诚实失败） |
-| [功能向整理](docs/eval_report_20260713.md) | 2026-07-13 | **23/26（88%）** | DeepSeek；3 例角色关键词检测过严 |
-| [Execution 离线工具集](docs/execution_snapshot_20260715.md) | 2026-07-15 | **8/8（100%）** | 不经 LLM；工具执行验收 |
-| [Execution Agent 端到端](docs/execution_agent_snapshot_20260715.md) | 2026-07-15 | **6/6（100%）** | DeepSeek live；`DISABLE_MCP=1` |
-| [Execution Agent 扩容 v2](docs/execution_agent_snapshot_20260715_v2.md) | 2026-07-15 | **24/24（100%）** | 易/中/难各 8；双工具/禁工具/算法 |
-| [Execution Agent 扩容 v3](docs/execution_agent_snapshot_20260716_v3.md) | 2026-07-16 | **36/36（100%）** | 易8/中12/难16 |
-| [Harness 可靠性对照](docs/reliability_snapshot_20260715.md) | 2026-07-15 | **4/4（100%）** | ToolGuard/自修注入故障 |
-| [Live 可靠性 ON/OFF](docs/reliability_live_live_20260716.md) | 2026-07-16 | flaky 6/6 vs 6/6 | **error_obs 0 vs 3**；tool_calls 1.0 vs 2.33 |
-| [Live 可靠性扩容 v2](docs/reliability_live_live_20260716_v2.md) | 2026-07-16 | flaky **20/20 vs 20/20** | **error_obs 0 vs 3.1**；calls **1.0 vs 2.25** |
-| [P0 证据地图](docs/P0_EVIDENCE_MAP.md) | 2026-07-16 | — | Execution × Reliability × Failure × Judge |
-| [飞轮闭环对照](docs/flywheel_closed_loop_20260716.md) | 2026-07-16 | **llm_offtrack 6→1** | 同批 100 条；duplicate Harness 已拦 |
-| Capability 集规模 | 2026-07-13 | **24 条** | 原 18 + 新 6；索引见 [EVAL_INDEX](docs/EVAL_INDEX.md) |
-
-Execution / 可靠性复跑：
-
-```bash
 python examples/run_execution_suite.py --publish
-set REACT_AGENT_DISABLE_MCP=1
-python examples/run_execution_suite.py --modes agent --publish
-python examples/run_reliability_harness.py --publish
-python examples/run_reliability_live.py --mock          # CI
-python examples/run_reliability_live.py --live --publish
-python examples/run_failure_flywheel.py --fixture --publish
-python examples/run_flywheel_closed_loop.py --publish
 ```
 
-Harness 长跑默认策略（可关）：`REACT_AGENT_TOOL_GUARD=1`、`REACT_AGENT_SELF_REPAIR=1`、`REACT_AGENT_MAX_STEPS` / `--max-steps`；评测默认 `REACT_AGENT_DISABLE_MCP=1`；live flaky 注入：`REACT_AGENT_INJECT_FLAKY=calculator:2`。
-
-与 [llm-eval-engine](https://github.com/weihuaguo270-ops/llm-eval-engine) 的 Process Reward / 人机校准打通见 `examples/agent_to_eval.py`；校准快照：[offline κ≈0.90](https://github.com/weihuaguo270-ops/llm-eval-engine/blob/master/docs/calibration_snapshot_20260716.md) · [live κ≈0.68](https://github.com/weihuaguo270-ops/llm-eval-engine/blob/master/docs/calibration_snapshot_20260716_live.md)。  
-失败归因周报见 [trace-debugger docs](https://github.com/weihuaguo270-ops/trace-debugger/blob/master/docs/FAILURE_INDEX.md)（含真实 100 条轨迹分布）。
+与 [llm-eval-engine](https://github.com/weihuaguo270-ops/llm-eval-engine) 校准口径：**held_out live κ≈0.59**（n=11，CI[0.26,1.0]）— 见 [METRICS_TRUST](https://github.com/weihuaguo270-ops/llm-eval-engine/blob/master/docs/METRICS_TRUST.md)，勿引用旧 n=15/κ≈0.47。  
+失败归因：[trace-debugger FAILURE_INDEX](https://github.com/weihuaguo270-ops/trace-debugger/blob/master/docs/FAILURE_INDEX.md)。
 
 ### Harness 轨迹 Schema + 闭环 Demo
 

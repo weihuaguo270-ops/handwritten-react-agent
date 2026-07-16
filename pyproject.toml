@@ -21,10 +21,13 @@ rag = [
 ]
 test = [
     "pytest>=7.0,<9",
+    "pytest-cov>=4.0,<7",
     "flake8>=6.0,<8",
 ]
 dev = [
     "react-agent[rag,test]",
+    "mypy>=1.8",
+    "pip-audit>=2.6",
 ]
 
 [project.scripts]

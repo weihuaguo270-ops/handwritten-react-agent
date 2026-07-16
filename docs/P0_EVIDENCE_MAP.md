@@ -7,7 +7,7 @@
 | **能不能干成** | 工具 / Agent 任务成功率 | [execution offline](./execution_snapshot_20260715.md) · [agent v3](./execution_agent_snapshot_20260716_v3.md) | offline **12/12**；agent **36/36**（易8/中12/难16） |
 | **坏了能不能撑住** | Guard/自修是否有效 | [注入对照](./reliability_snapshot_20260715.md) · [live v2](./reliability_live_live_20260716_v2.md) | 注入 **4/4**；live flaky **n=20**：ON/OFF 皆 100%，**error_obs 0 vs 3.1**，**tool_calls 1.0 vs 2.25** |
 | **坏在哪** | 轨迹失败分布 | [tdebug 真实 100 条](https://github.com/weihuaguo270-ops/trace-debugger/blob/master/docs/tdebug_failure_real_20260715.md) · [飞轮闭环](./flywheel_closed_loop_20260716.md) | 同批重扫：`llm_offtrack` **6→1**；duplicate Harness 已拦 |
-| **评得清不清** | Judge 与人标一致吗 | [κ offline v3](https://github.com/weihuaguo270-ops/llm-eval-engine/blob/master/docs/calibration_snapshot_20260716_offline.md) · [κ live](https://github.com/weihuaguo270-ops/llm-eval-engine/blob/master/docs/calibration_snapshot_20260716_live.md) · [怎么读](https://github.com/weihuaguo270-ops/llm-eval-engine/blob/master/docs/METRICS_TRUST.md) | **held_out live** κ≈**0.59**（n=11，CI[0.26,1.0]）；全量 live κ≈**0.68**；offline held_out=1.0 仅冻结分 |
+| **评得清不清** | Judge 与人标一致吗 | [κ offline](https://github.com/weihuaguo270-ops/llm-eval-engine/blob/master/docs/calibration_snapshot_20260716_offline.md) · [κ live](https://github.com/weihuaguo270-ops/llm-eval-engine/blob/master/docs/calibration_snapshot_20260716_live.md) · [怎么读](https://github.com/weihuaguo270-ops/llm-eval-engine/blob/master/docs/METRICS_TRUST.md) | **held_out live** κ≈**0.59**（n=11，CI[0.26,1.0]）；全量 live ≈0.68；offline held_out=1.0（n=20，冻结） |
 
 ## 怎么读（简历叙事）
 

@@ -1,4 +1,5 @@
-"""ReAct Agent Framework — Agent 学习实现
+"""ReAct Agent — 手写学习运行时（非生产）
 
-包含核心 ReAct 循环、工具注册、RAG、MCP 客户端、多 Agent 编排等模块。
+Core：ReAct 循环、工具、Harness 轨迹、学习级权限。
+实验模块（RAG/MCP/多 Agent 等）见 docs/EXPERIMENTAL.md。
 """
