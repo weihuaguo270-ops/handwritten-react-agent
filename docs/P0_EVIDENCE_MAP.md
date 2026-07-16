@@ -11,7 +11,7 @@
 
 ## 怎么读（简历叙事）
 
-1. **Agent 开发岗**：先甩 execution 24/24 + live reliability ON/OFF 表 → 再链 tdebug 失败分布。  
+1. **Agent 开发岗**：先甩 execution **36/36** + live reliability ON/OFF 表 → 再链 tdebug 失败分布与飞轮闭环。  
 2. **评测岗**：先甩 κ 校准 + tdebug 失败 taxonomy → 再说明 execution 是「任务通过率」另一轨。  
 3. **不要合并成一个数字**：offline ≠ agent ≠ Judge 分。
 

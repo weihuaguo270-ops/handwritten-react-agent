@@ -246,7 +246,7 @@ python examples/run_flywheel_closed_loop.py --publish
 
 Harness 长跑默认策略（可关）：`REACT_AGENT_TOOL_GUARD=1`、`REACT_AGENT_SELF_REPAIR=1`、`REACT_AGENT_MAX_STEPS` / `--max-steps`；评测默认 `REACT_AGENT_DISABLE_MCP=1`；live flaky 注入：`REACT_AGENT_INJECT_FLAKY=calculator:2`。
 
-与 [llm-eval-engine](https://github.com/weihuaguo270-ops/llm-eval-engine) 的 Process Reward / 人机校准打通见 `examples/agent_to_eval.py`；校准快照在 eval-engine 的 `docs/calibration_snapshot_*.md`。  
+与 [llm-eval-engine](https://github.com/weihuaguo270-ops/llm-eval-engine) 的 Process Reward / 人机校准打通见 `examples/agent_to_eval.py`；校准快照：[offline κ≈0.90](https://github.com/weihuaguo270-ops/llm-eval-engine/blob/master/docs/calibration_snapshot_20260716.md) · [live κ≈0.68](https://github.com/weihuaguo270-ops/llm-eval-engine/blob/master/docs/calibration_snapshot_20260716_live.md)。  
 失败归因周报见 [trace-debugger docs](https://github.com/weihuaguo270-ops/trace-debugger/blob/master/docs/FAILURE_INDEX.md)（含真实 100 条轨迹分布）。
 
 ### Harness 轨迹 Schema + 闭环 Demo
