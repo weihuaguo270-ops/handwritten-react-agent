@@ -20,6 +20,7 @@ import sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "src"))
 
+from react_agent.console_io import configure_stdio, safe_print  # noqa: E402
 from react_agent.harness.schema import (  # noqa: E402
     TrajectorySchemaError,
     assert_valid,
@@ -27,6 +28,8 @@ from react_agent.harness.schema import (  # noqa: E402
     validate_trajectory,
 )
 from react_agent.harness import start_trajectory, finish_trajectory  # noqa: E402
+
+configure_stdio()
 
 FIXTURE = os.path.join(
     os.path.dirname(__file__), "fixtures", "harness_closed_loop.json"

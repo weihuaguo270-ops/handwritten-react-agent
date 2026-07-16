@@ -690,7 +690,8 @@ def _setup_config():
     # 5. 保存
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
-    print(f"\n✅ 配置已保存到: {config_path}")
+    print(f"\n[OK] 配置已保存到: {config_path}")
+
     print(f"   默认提供商: {selected_provider}")
     print(f"   模型: {model}")
     print(f"\n现在可以运行: agent \"你的问题\"")

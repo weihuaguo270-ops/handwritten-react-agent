@@ -70,6 +70,38 @@ jobs:
           echo "skip flywheel: no sibling trace-debugger"
         fi
 
+  # Windows: default console often GBK — catch emoji/encoding regressions early
+  test-windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: pip install -e ".[test]"
+    - name: Script tests (no PYTHONIOENCODING)
+      shell: powershell
+      run: |
+        Remove-Item Env:PYTHONIOENCODING -ErrorAction SilentlyContinue
+        python test_all.py
+    - name: Pytest offline + console/final-answer guards
+      shell: powershell
+      run: |
+        Remove-Item Env:PYTHONIOENCODING -ErrorAction SilentlyContinue
+        $env:REACT_AGENT_SKIP_RAG = "1"
+        python -m pytest tests/test_console_io.py tests/test_final_answer_guard.py tests/test_eval_engine_contract.py tests/test_harness_schema.py -q
+    - name: Harness closed-loop fixture
+      shell: powershell
+      run: |
+        Remove-Item Env:PYTHONIOENCODING -ErrorAction SilentlyContinue
+        python examples/harness_closed_loop.py --fixture
+
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 10

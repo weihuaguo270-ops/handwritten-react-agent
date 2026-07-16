@@ -9,17 +9,22 @@ import sys
 import os
 import json
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from react_agent.console_io import FAIL, PASS, configure_stdio, safe_print
+
+configure_stdio()
 
 errors = []
 
 
 def check(name, cond, detail=""):
     if cond:
-        print(f"  ✅ {name}")
+        safe_print(f"  {PASS} {name}")
     else:
-        msg = f"  ❌ {name}" + (f" — {detail}" if detail else "")
-        print(msg)
+        msg = f"  {FAIL} {name}" + (f" — {detail}" if detail else "")
+        safe_print(msg)
         errors.append(name)
 
 
@@ -406,9 +411,9 @@ os.remove(path) if os.path.exists(path) else None
 # ============================================================
 print(f"\n{'='*50}")
 if errors:
-    print(f"❌ {len(errors)} 项失败:")
+    safe_print(f"{FAIL} {len(errors)} 项失败:")
     for e in errors:
-        print(f"   - {e}")
+        safe_print(f"   - {e}")
 else:
-    print("🎉 全部测试通过!")
+    safe_print(f"{PASS} 全部测试通过!")
 print(f"{'='*50}")

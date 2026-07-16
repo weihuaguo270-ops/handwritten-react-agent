@@ -11,6 +11,7 @@
 - **飞轮真闭环**：相邻同参工具拦截（`REACT_AGENT_BLOCK_DUPLICATE_TOOLS`）+ `run_flywheel_closed_loop.py`；同批 100 条 `llm_offtrack` **6→1**
 - **跨仓评分契约**：`score_with_eval_engine` 对齐 `extra_contracts`；`EvalIntegrationError` + `tests/test_eval_engine_contract.py`
 - **收尾强制 FINAL ANSWER**：预留末步禁工具（`REACT_AGENT_RESERVE_FINAL_STEP`）+ max_steps 后无工具强制总结；回归 `tests/test_final_answer_guard.py`
+- **Windows 控制台安全输出**：`console_io.safe_print` + `[PASS]/[FAIL]`；CI 增加 `windows-latest` × 3.10/3.11
 - Harness 长跑：默认接通 `ToolGuard`（超时/重试/熔断）与工具失败自修提示；评测透传 `max_steps`
 
 ## 0.1.0 (2026-07-13)
