@@ -1,7 +1,7 @@
 """Harness trajectory schema — validate & normalize Format B JSON.
 
 Canonical schema file: schemas/harness_trajectory.schema.json
-Consumers: react-agent recorder, trace-debugger, llm-eval-engine.
+Consumers: react-agent recorder, trace-debugger, and llm-eval-engine.
 """
 from __future__ import annotations
 
@@ -10,6 +10,19 @@ import os
 from typing import Any, Optional
 
 SCHEMA_FILENAME = "harness_trajectory.schema.json"
+
+# Format B wire version. Bump major on breaking field/semantics changes.
+# Trajectories without schema_version are treated as major "1" (compat).
+SCHEMA_VERSION = "1"
+
+
+def schema_major(version: Optional[str] = None) -> str:
+    """Return major component of a schema_version string (default: current)."""
+    raw = (version if version is not None else SCHEMA_VERSION) or ""
+    raw = str(raw).strip()
+    if not raw:
+        return SCHEMA_VERSION
+    return raw.split(".", 1)[0]
 
 
 def schema_path() -> str:
@@ -45,12 +58,28 @@ def validate_trajectory(data: dict, *, strict_one_based: bool = True) -> list[st
         if key not in data:
             issues.append(f"missing required field: {key}")
 
-    if "session_id" in data and (not isinstance(data["session_id"], str) or not data["session_id"].strip()):
+    if "session_id" in data and (
+        not isinstance(data["session_id"], str) or not data["session_id"].strip()
+    ):
         issues.append("session_id must be a non-empty string")
     if "query" in data and not isinstance(data.get("query"), str):
         issues.append("query must be a string")
     if "final_answer" in data and not isinstance(data.get("final_answer"), str):
         issues.append("final_answer must be a string")
+
+    # Version: absent ⇒ treat as SCHEMA_VERSION major (backward compatible)
+    if "schema_version" in data:
+        sv = data.get("schema_version")
+        if not isinstance(sv, (str, int)) or (isinstance(sv, str) and not sv.strip()):
+            issues.append("schema_version must be a non-empty string when present")
+        else:
+            got = schema_major(str(sv))
+            want = schema_major(SCHEMA_VERSION)
+            if got != want:
+                issues.append(
+                    f"schema_version major {got!r} incompatible with supported "
+                    f"{want!r} (SCHEMA_VERSION={SCHEMA_VERSION})"
+                )
 
     steps = data.get("steps")
     if steps is not None and not isinstance(steps, list):
@@ -74,7 +103,9 @@ def validate_trajectory(data: dict, *, strict_one_based: bool = True) -> list[st
             issues.append(f"{prefix}.step: must be an integer")
             continue
         if strict_one_based and n < 1:
-            issues.append(f"{prefix}.step: must be >= 1 (got {n}); Format B is 1-based")
+            issues.append(
+                f"{prefix}.step: must be >= 1 (got {n}); Format B is 1-based"
+            )
         if n in seen:
             issues.append(f"{prefix}.step: duplicate step number {n}")
         seen.add(n)
@@ -85,13 +116,12 @@ def validate_trajectory(data: dict, *, strict_one_based: bool = True) -> list[st
             issues.extend(_validate_tool_call(f"{prefix}.action", action))
         if actions is not None:
             if not isinstance(actions, list) or not actions:
-                issues.append(f"{prefix}.actions: must be a non-empty array when present")
+                issues.append(
+                    f"{prefix}.actions: must be a non-empty array when present"
+                )
             else:
                 for j, a in enumerate(actions):
                     issues.extend(_validate_tool_call(f"{prefix}.actions[{j}]", a))
-        if action is None and actions is None:
-            # thought-only / observation-only steps are allowed
-            pass
 
     return issues
 
@@ -109,10 +139,12 @@ def normalize_trajectory(data: dict) -> dict:
 
     - Keeps 1-based ``step`` as-is
     - Ensures each tool call exposes string ``arguments`` when only ``args`` exists
-    - Flattens singular ``action`` from first of ``actions`` when needed for readers
-      that only understand ``action``
+    - Flattens singular ``action`` from first of ``actions`` when needed
+    - Stamps ``schema_version`` when absent (compat emit)
     """
     out = dict(data)
+    if "schema_version" not in out:
+        out["schema_version"] = SCHEMA_VERSION
     steps_out = []
     for step in data.get("steps") or []:
         s = dict(step)
@@ -157,7 +189,6 @@ def _validate_tool_call(prefix: str, action: Any) -> list[str]:
     if not isinstance(name, str) or not name.strip():
         issues.append(f"{prefix}.name: required non-empty string")
     if "arguments" not in action and "args" not in action:
-        # allowed: name-only tool call
         return issues
     args = action.get("arguments", action.get("args"))
     if not isinstance(args, (str, dict)):

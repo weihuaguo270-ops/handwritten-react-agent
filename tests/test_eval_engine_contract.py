@@ -11,6 +11,7 @@ pytest.importorskip("eval_engine")
 from eval_engine.core.process_reward import ProcessRewardScorer  # noqa: E402
 
 from react_agent.eval.scorer import (  # noqa: E402
+    EVAL_API_VERSION,
     EVAL_ENGINE_API_CONTRACT,
     EvalIntegrationError,
     score_with_eval_engine,
@@ -29,6 +30,14 @@ _TRAJ = {
     ],
     "final_answer": "done",
 }
+
+
+def test_eval_api_version_pinned():
+    assert EVAL_API_VERSION == "0.1"
+    assert EVAL_ENGINE_API_CONTRACT == f"ProcessRewardScorer.extra_contracts@{EVAL_API_VERSION}"
+    from eval_engine.core.process_reward import EVAL_API_VERSION as ee_ver
+
+    assert ee_ver == EVAL_API_VERSION
 
 
 def test_process_reward_scorer_accepts_extra_contracts_not_verifiers():

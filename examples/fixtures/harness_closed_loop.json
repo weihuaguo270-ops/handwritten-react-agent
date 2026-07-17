@@ -1,5 +1,6 @@
 {
   "session_id": "harness_demo_001",
+  "schema_version": "1",
   "query": "Python 里 list.sort 怎么用？",
   "model": "mock-gpt",
   "timestamp": "2026-07-14T12:00:00Z",

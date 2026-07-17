@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Added
+- **P2 跨仓版本化**：`SCHEMA_VERSION` / `EVAL_API_VERSION`；缺省轨迹兼容 major `1`；不兼容 major 校验失败
+- **Core 懒加载**：`react_loop` 不再顶层导入 MCP / Orchestrator / RAG；`tests/test_core_lazy_imports.py`
+- **tdebug↔eval 契约**：`tests/test_tdebug_eval_contract.py`（integration CI）
 - Execution-based 离线任务集：`execution_dataset.json` + `execution_scorer` + `examples/run_execution_suite.py`（8/8 公开快照）
 - **Agent 端到端 execution**：`--modes agent`；扩至 **36** 条（易8/中12/难16，公开 36/36）；评测默认 `REACT_AGENT_DISABLE_MCP=1`
 - Harness 可靠性注入对照：`examples/run_reliability_harness.py`（4/4 公开快照）

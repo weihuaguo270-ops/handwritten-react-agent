@@ -85,8 +85,11 @@ class Trajectory:
         self.final_answer = answer[:1000] if answer else ""
 
     def to_dict(self) -> dict:
+        from react_agent.harness.schema import SCHEMA_VERSION
+
         duration = round(time.time() - self._start_time, 2)
         return {
+            "schema_version": SCHEMA_VERSION,
             "session_id": self.session_id,
             "query": self.query[:500],
             "model": self.model,

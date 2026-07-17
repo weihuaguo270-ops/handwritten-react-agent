@@ -23,8 +23,6 @@ from typing import Optional
 from urllib import request as req
 from urllib.error import URLError
 from urllib.parse import urlparse, quote
-from react_agent.mcp_client import MCPClient
-from react_agent.orchestrator import Orchestrator
 from react_agent.tot import TOT, set_tot_llm_call
 from react_agent.cot import COT
 from react_agent.prompts import ROLE_MANAGER
@@ -64,15 +62,14 @@ os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
 from react_agent.memory import Memory
 
 MEMORY = Memory()
-from react_agent.rag import RAG_INDEX, rag_query, RAG_TOOL_DEFINITION
 
-# ============================================================
-# 懒加载 RAG 知识库：只在首次需要时加载，避免 --help/--setup 等待
-# ============================================================
+# Experimental: MCP / Orchestrator / RAG are lazy-imported (Core default path stays light).
+# See docs/EXPERIMENTAL.md
 _rag_loaded = False
 
+
 def _ensure_rag_loaded():
-    """首次调用时加载 RAG 知识库，后续不再重复"""
+    """首次需要时加载 RAG 知识库（避免 Core import / --help 拉起重依赖）。"""
     global _rag_loaded
     if _rag_loaded:
         return
@@ -81,8 +78,10 @@ def _ensure_rag_loaded():
         print("[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载")
         return
     print("[启动] 正在加载 RAG 知识库...")
-    _rag_dir = os.path.dirname(os.path.abspath(__file__))
     try:
+        from react_agent.rag import RAG_INDEX
+
+        _rag_dir = os.path.dirname(os.path.abspath(__file__))
         n = RAG_INDEX.ingest_directory(_rag_dir)
         print(f"[启动] RAG 知识库就绪：{len(RAG_INDEX.chunks)} 个片段 (来自 {n} 个文件)")
     except Exception as e:
@@ -580,8 +579,12 @@ def auto_extract_memory(user_query, assistant_answer):
 
 
 def multi_agent_chain(user_query, parallel=False):
-    """多 Agent 协作（内部使用 Orchestrator 类）"""
-    return Orchestrator(call_llm, react_loop, tool_definitions=TOOL_DEFINITIONS).execute(user_query, parallel=parallel)
+    """多 Agent 协作（内部使用 Orchestrator 类；懒加载以免 Core 默认路径导入）。"""
+    from react_agent.orchestrator import Orchestrator
+
+    return Orchestrator(call_llm, react_loop, tool_definitions=TOOL_DEFINITIONS).execute(
+        user_query, parallel=parallel
+    )
 
 def _setup_config():
     """交互式配置向导：创建/更新 llm_config.json"""
@@ -766,6 +769,8 @@ def main():
         args = mcp_args[1:]
         print("  [MCP] connect")
         try:
+            from react_agent.mcp_client import MCPClient
+
             client = MCPClient(cmd, args)
             client.connect()
             client.discover_tools()

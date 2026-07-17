@@ -100,7 +100,7 @@ jobs:
       run: |
         Remove-Item Env:PYTHONIOENCODING -ErrorAction SilentlyContinue
         $env:REACT_AGENT_SKIP_RAG = "1"
-        python -m pytest tests/test_console_io.py tests/test_final_answer_guard.py tests/test_eval_engine_contract.py tests/test_harness_schema.py -q
+        python -m pytest tests/test_console_io.py tests/test_final_answer_guard.py tests/test_eval_engine_contract.py tests/test_harness_schema.py tests/test_core_lazy_imports.py -q
     - name: Schema validate fixture (siblings optional on Windows)
       shell: powershell
       run: |
@@ -178,7 +178,7 @@ jobs:
     - name: Verify eval-engine scoring path
       run: |
         python tests/ci_verify_integration.py
-        pytest tests/test_eval_engine_contract.py -q
+        pytest tests/test_eval_engine_contract.py tests/test_tdebug_eval_contract.py -q
 
   # Probe secret without exposing it in job-level `if` (secrets context is invalid there).
   real-llm-gate:

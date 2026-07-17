@@ -16,7 +16,9 @@ from typing import Any, Optional, Callable
 logger = logging.getLogger(__name__)
 
 # 跨仓 Python API 契约版本（CI test_eval_engine_contract 会校验）
-EVAL_ENGINE_API_CONTRACT = "ProcessRewardScorer.extra_contracts@0.1"
+# Bump EVAL_API_VERSION when ProcessRewardScorer kwargs / success payload shape breaks.
+EVAL_API_VERSION = "0.1"
+EVAL_ENGINE_API_CONTRACT = f"ProcessRewardScorer.extra_contracts@{EVAL_API_VERSION}"
 
 
 class EvalIntegrationError(RuntimeError):

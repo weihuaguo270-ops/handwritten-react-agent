@@ -9,9 +9,11 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "src"))
 
 from react_agent.harness.schema import (
+    SCHEMA_VERSION,
     TrajectorySchemaError,
     assert_valid,
     normalize_trajectory,
+    schema_major,
     validate_trajectory,
 )
 
@@ -75,3 +77,43 @@ def test_actions_array_gets_singular_action():
     }
     norm = normalize_trajectory(raw)
     assert norm["steps"][0]["action"]["name"] == "web_search"
+
+
+def test_schema_version_constant_is_major_1():
+    assert schema_major(SCHEMA_VERSION) == "1"
+
+
+def test_missing_schema_version_is_ok():
+    raw = {
+        "session_id": "x",
+        "query": "q",
+        "final_answer": "a",
+        "steps": [{"step": 1, "thought": "t"}],
+    }
+    assert validate_trajectory(raw) == []
+
+
+def test_incompatible_schema_major_fails():
+    bad = {
+        "session_id": "x",
+        "query": "q",
+        "final_answer": "a",
+        "schema_version": "99",
+        "steps": [{"step": 1, "thought": "t"}],
+    }
+    issues = validate_trajectory(bad)
+    assert any("incompatible" in i for i in issues)
+    with pytest.raises(TrajectorySchemaError):
+        assert_valid(bad)
+
+
+def test_normalize_stamps_schema_version():
+    raw = {
+        "session_id": "x",
+        "query": "q",
+        "final_answer": "a",
+        "steps": [{"step": 1, "thought": "t"}],
+    }
+    norm = normalize_trajectory(raw)
+    assert norm["schema_version"] == SCHEMA_VERSION
+    assert "schema_version" not in raw
