@@ -1,0 +1,619 @@
+{
+  "report_id": "public_bench_20260717_020304",
+  "timestamp": "2026-07-17T02:03:04.109360+00:00",
+  "dataset": "public_benchmark_subset.json",
+  "bundle_name": "public_agent_benchmark_subset_v1",
+  "bundle_version": "1",
+  "modes": [
+    "agent"
+  ],
+  "summary": {
+    "total": 20,
+    "passed": 19,
+    "failed": 1,
+    "pass_rate": 95.0,
+    "pass_rate_wilson_95": {
+      "point": 95.0,
+      "low": 76.4,
+      "high": 99.1
+    },
+    "agent_n": 20,
+    "agent_with_tools_n": 20,
+    "honesty": "公开子集 n=20（GSM8K×10 + HotpotQA×10）；offline 只验证匹配器；agent 数字绑定模型/日期，勿当全量榜"
+  },
+  "by_benchmark": {
+    "gsm8k": {
+      "passed": 10,
+      "total": 10,
+      "pass_rate": 100.0
+    },
+    "hotpotqa": {
+      "passed": 9,
+      "total": 10,
+      "pass_rate": 90.0
+    }
+  },
+  "by_mode": {
+    "agent": {
+      "passed": 19,
+      "total": 20,
+      "pass_rate": 95.0
+    }
+  },
+  "license_notes": "GSM8K: MIT (OpenAI). HotpotQA: CC BY-SA 4.0. Redistributed subset for evaluation only.",
+  "results": [
+    {
+      "id": "gsm8k_test_0000",
+      "name": "gsm8k_test_0000",
+      "benchmark": "gsm8k",
+      "tags": [
+        "public_benchmark",
+        "gsm8k"
+      ],
+      "difficulty": "easy",
+      "mode": "agent",
+      "passed": true,
+      "skipped": false,
+      "duration_seconds": 21.69,
+      "exit_code": 0,
+      "tools_called": [
+        "calculator"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "18",
+      "gold_match": {
+        "passed": true,
+        "reason": "pred=18 gold=18"
+      },
+      "stdout_preview": "[记忆] 已加载 11 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] code_reviewer\n\n============================================================\n用户: （相关记忆：当前时间为2026-07-16 08:59:46）\n（相关记忆：- 助手执行的代码功能：计算 1+2+3+4+5 并打印结果）\n（相关记忆：（无具体事实信息提取））Solve this grade-school math word problem. You may use calculator or execute_python. End with FINAL ANSWER containing only the numeric result.\n\nJanet’",
+      "final_answer_preview": "18",
+      "reason": "gold ok: pred=18 gold=18"
+    },
+    {
+      "id": "gsm8k_test_0001",
+      "name": "gsm8k_test_0001",
+      "benchmark": "gsm8k",
+      "tags": [
+        "public_benchmark",
+        "gsm8k"
+      ],
+      "difficulty": "easy",
+      "mode": "agent",
+      "passed": true,
+      "skipped": false,
+      "duration_seconds": 19.91,
+      "exit_code": 0,
+      "tools_called": [
+        "calculator"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "3",
+      "gold_match": {
+        "passed": true,
+        "reason": "pred=3 gold=3"
+      },
+      "stdout_preview": "[记忆] 已加载 11 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] code_reviewer\n\n============================================================\n用户: （相关记忆：- 助手执行的代码功能：计算 1+2+3+4+5 并打印结果）\n（相关记忆：（无具体事实信息提取））\n（相关记忆：当前时间为2026-07-16 08:59:46）Solve this grade-school math word problem. You may use calculator or execute_python. End with FINAL ANSWER containing only the numeric result.\n\nA robe",
+      "final_answer_preview": "3",
+      "reason": "gold ok: pred=3 gold=3"
+    },
+    {
+      "id": "gsm8k_test_0002",
+      "name": "gsm8k_test_0002",
+      "benchmark": "gsm8k",
+      "tags": [
+        "public_benchmark",
+        "gsm8k"
+      ],
+      "difficulty": "easy",
+      "mode": "agent",
+      "passed": true,
+      "skipped": false,
+      "duration_seconds": 25.6,
+      "exit_code": 0,
+      "tools_called": [
+        "calculator"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "70000",
+      "gold_match": {
+        "passed": true,
+        "reason": "pred=70000 gold=70000"
+      },
+      "stdout_preview": "[记忆] 已加载 11 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] code_reviewer\n\n============================================================\n用户: （相关记忆：100/4的计算结果为25.0）\n（相关记忆：- 助手执行的代码功能：计算 1+2+3+4+5 并打印结果）\n（相关记忆：当前时间为2026-07-16 08:59:46）Solve this grade-school math word problem. You may use calculator or execute_python. End with FINAL ANSWER containing only the numeric result.\n\nJo",
+      "final_answer_preview": "70000",
+      "reason": "gold ok: pred=70000 gold=70000"
+    },
+    {
+      "id": "gsm8k_test_0003",
+      "name": "gsm8k_test_0003",
+      "benchmark": "gsm8k",
+      "tags": [
+        "public_benchmark",
+        "gsm8k"
+      ],
+      "difficulty": "easy",
+      "mode": "agent",
+      "passed": true,
+      "skipped": false,
+      "duration_seconds": 18.89,
+      "exit_code": 0,
+      "tools_called": [
+        "calculator"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "540",
+      "gold_match": {
+        "passed": true,
+        "reason": "pred=540 gold=540"
+      },
+      "stdout_preview": "[记忆] 已加载 11 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] code_reviewer\n\n============================================================\n用户: （相关记忆：当前时间为2026-07-16 08:59:46）\n（相关记忆：- 助手执行的代码功能：计算 1+2+3+4+5 并打印结果）\n（相关记忆：100/4的计算结果为25.0）Solve this grade-school math word problem. You may use calculator or execute_python. End with FINAL ANSWER containing only the numeric result.\n\nJa",
+      "final_answer_preview": "540",
+      "reason": "gold ok: pred=540 gold=540"
+    },
+    {
+      "id": "gsm8k_test_0004",
+      "name": "gsm8k_test_0004",
+      "benchmark": "gsm8k",
+      "tags": [
+        "public_benchmark",
+        "gsm8k"
+      ],
+      "difficulty": "easy",
+      "mode": "agent",
+      "passed": true,
+      "skipped": false,
+      "duration_seconds": 19.49,
+      "exit_code": 0,
+      "tools_called": [
+        "calculator"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "20",
+      "gold_match": {
+        "passed": true,
+        "reason": "pred=20 gold=20"
+      },
+      "stdout_preview": "[记忆] 已加载 11 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] code_reviewer\n\n============================================================\n用户: （相关记忆：当前时间为2026-07-16 08:59:46）\n（相关记忆：- 助手执行的代码功能：计算 1+2+3+4+5 并打印结果）\n（相关记忆：（无具体事实信息提取））Solve this grade-school math word problem. You may use calculator or execute_python. End with FINAL ANSWER containing only the numeric result.\n\nEvery ",
+      "final_answer_preview": "20",
+      "reason": "gold ok: pred=20 gold=20"
+    },
+    {
+      "id": "gsm8k_test_0005",
+      "name": "gsm8k_test_0005",
+      "benchmark": "gsm8k",
+      "tags": [
+        "public_benchmark",
+        "gsm8k"
+      ],
+      "difficulty": "medium",
+      "mode": "agent",
+      "passed": true,
+      "skipped": false,
+      "duration_seconds": 19.39,
+      "exit_code": 0,
+      "tools_called": [
+        "calculator"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "64",
+      "gold_match": {
+        "passed": true,
+        "reason": "pred=64 gold=64"
+      },
+      "stdout_preview": "[记忆] 已加载 11 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] code_reviewer\n\n============================================================\n用户: （相关记忆：- 助手执行的代码功能：计算 1+2+3+4+5 并打印结果）\n（相关记忆：100/4的计算结果为25.0）\n（相关记忆：当前时间为2026-07-16 08:59:46）Solve this grade-school math word problem. You may use calculator or execute_python. End with FINAL ANSWER containing only the numeric result.\n\nKy",
+      "final_answer_preview": "64",
+      "reason": "gold ok: pred=64 gold=64"
+    },
+    {
+      "id": "gsm8k_test_0006",
+      "name": "gsm8k_test_0006",
+      "benchmark": "gsm8k",
+      "tags": [
+        "public_benchmark",
+        "gsm8k"
+      ],
+      "difficulty": "medium",
+      "mode": "agent",
+      "passed": true,
+      "skipped": false,
+      "duration_seconds": 17.86,
+      "exit_code": 0,
+      "tools_called": [
+        "calculator"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "260",
+      "gold_match": {
+        "passed": true,
+        "reason": "pred=260 gold=260"
+      },
+      "stdout_preview": "[记忆] 已加载 11 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] code_reviewer\n\n============================================================\n用户: （相关记忆：- 助手执行的代码功能：计算 1+2+3+4+5 并打印结果）\n（相关记忆：当前时间为2026-07-16 08:59:46）\n（相关记忆：100/4的计算结果为25.0）Solve this grade-school math word problem. You may use calculator or execute_python. End with FINAL ANSWER containing only the numeric result.\n\nTo",
+      "final_answer_preview": "260",
+      "reason": "gold ok: pred=260 gold=260"
+    },
+    {
+      "id": "gsm8k_test_0007",
+      "name": "gsm8k_test_0007",
+      "benchmark": "gsm8k",
+      "tags": [
+        "public_benchmark",
+        "gsm8k"
+      ],
+      "difficulty": "medium",
+      "mode": "agent",
+      "passed": true,
+      "skipped": false,
+      "duration_seconds": 26.91,
+      "exit_code": 0,
+      "tools_called": [
+        "calculator"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "160",
+      "gold_match": {
+        "passed": true,
+        "reason": "pred=160 gold=160"
+      },
+      "stdout_preview": "[记忆] 已加载 11 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] code_reviewer\n\n============================================================\n用户: （相关记忆：- 助手执行的代码功能：计算 1+2+3+4+5 并打印结果）\n（相关记忆：当前时间为2026-07-16 08:59:46）\n（相关记忆：100/4的计算结果为25.0）Solve this grade-school math word problem. You may use calculator or execute_python. End with FINAL ANSWER containing only the numeric result.\n\nCa",
+      "final_answer_preview": "160",
+      "reason": "gold ok: pred=160 gold=160"
+    },
+    {
+      "id": "gsm8k_test_0008",
+      "name": "gsm8k_test_0008",
+      "benchmark": "gsm8k",
+      "tags": [
+        "public_benchmark",
+        "gsm8k"
+      ],
+      "difficulty": "medium",
+      "mode": "agent",
+      "passed": true,
+      "skipped": false,
+      "duration_seconds": 19.47,
+      "exit_code": 0,
+      "tools_called": [
+        "calculator"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "45",
+      "gold_match": {
+        "passed": true,
+        "reason": "pred=45 gold=45"
+      },
+      "stdout_preview": "[记忆] 已加载 11 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] code_reviewer\n\n============================================================\n用户: （相关记忆：当前时间为2026-07-16 08:59:46）\n（相关记忆：100/4的计算结果为25.0）\n（相关记忆：- 助手执行的代码功能：计算 1+2+3+4+5 并打印结果）Solve this grade-school math word problem. You may use calculator or execute_python. End with FINAL ANSWER containing only the numeric result.\n\nJo",
+      "final_answer_preview": "45",
+      "reason": "gold ok: pred=45 gold=45"
+    },
+    {
+      "id": "gsm8k_test_0009",
+      "name": "gsm8k_test_0009",
+      "benchmark": "gsm8k",
+      "tags": [
+        "public_benchmark",
+        "gsm8k"
+      ],
+      "difficulty": "medium",
+      "mode": "agent",
+      "passed": true,
+      "skipped": false,
+      "duration_seconds": 17.51,
+      "exit_code": 0,
+      "tools_called": [
+        "calculator"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "460",
+      "gold_match": {
+        "passed": true,
+        "reason": "pred=460 gold=460"
+      },
+      "stdout_preview": "[记忆] 已加载 11 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] code_reviewer\n\n============================================================\n用户: （相关记忆：当前时间为2026-07-16 08:59:46）\n（相关记忆：100/4的计算结果为25.0）\n（相关记忆：- 助手执行的代码功能：计算 1+2+3+4+5 并打印结果）Solve this grade-school math word problem. You may use calculator or execute_python. End with FINAL ANSWER containing only the numeric result.\n\nEl",
+      "final_answer_preview": "460",
+      "reason": "gold ok: pred=460 gold=460"
+    },
+    {
+      "id": "hotpot_val_0000",
+      "name": "hotpot_val_0000",
+      "benchmark": "hotpotqa",
+      "tags": [
+        "public_benchmark",
+        "hotpotqa"
+      ],
+      "difficulty": "medium",
+      "mode": "agent",
+      "passed": true,
+      "skipped": false,
+      "duration_seconds": 46.94,
+      "exit_code": 0,
+      "tools_called": [
+        "fetch_page",
+        "web_search"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "Chief of Protocol",
+      "gold_match": {
+        "passed": true,
+        "reason": "contains"
+      },
+      "stdout_preview": "[记忆] 已加载 11 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] research_assistant\n\n============================================================\n用户: （相关记忆：当前时间为2026-07-16 08:59:46）\n（相关记忆：- 获奖理由：发现了电路中的宏观量子力学隧穿效应和能量量子化）\n（相关记忆：- 助手执行的代码功能：计算 1+2+3+4+5 并打印结果）Answer this multi-hop factual question. Use web_search and/or fetch_page when needed. Give a short FINAL ANSWER with the fact ",
+      "final_answer_preview": "美国驻加纳大使（United States Ambassador to Ghana，1974–1976），后亦曾任美国国务院礼宾司司长（Chief of Protocol，1976–1977）及美国驻捷克斯洛伐克大使（United States Ambassador to Czechoslovakia，1989–1992）。",
+      "reason": "gold ok: contains"
+    },
+    {
+      "id": "hotpot_val_0001",
+      "name": "hotpot_val_0001",
+      "benchmark": "hotpotqa",
+      "tags": [
+        "public_benchmark",
+        "hotpotqa"
+      ],
+      "difficulty": "medium",
+      "mode": "agent",
+      "passed": true,
+      "skipped": false,
+      "duration_seconds": 47.46,
+      "exit_code": 0,
+      "tools_called": [
+        "fetch_page",
+        "web_search"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "Animorphs",
+      "gold_match": {
+        "passed": true,
+        "reason": "contains"
+      },
+      "stdout_preview": "[记忆] 已加载 13 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] research_assistant\n\n============================================================\n用户: （相关记忆：当前时间为2026-07-16 08:59:46）\n（相关记忆：- 获奖理由：发现了电路中的宏观量子力学隧穿效应和能量量子化）\n（相关记忆：- 助手执行的代码功能：计算 1+2+3+4+5 并打印结果）Answer this multi-hop factual question. Use web_search and/or fetch_page when needed. Give a short FINAL ANSWER with the fact ",
+      "final_answer_preview": "** **Animorphs**（作者 K.A. Applegate）",
+      "reason": "gold ok: contains"
+    },
+    {
+      "id": "hotpot_val_0002",
+      "name": "hotpot_val_0002",
+      "benchmark": "hotpotqa",
+      "tags": [
+        "public_benchmark",
+        "hotpotqa"
+      ],
+      "difficulty": "medium",
+      "mode": "agent",
+      "passed": false,
+      "skipped": false,
+      "duration_seconds": 40.28,
+      "exit_code": 0,
+      "tools_called": [
+        "fetch_page",
+        "web_search"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "Greenwich Village, New York City",
+      "gold_match": {
+        "passed": false,
+        "reason": "gold 'Greenwich Village, New York City' not found in prediction"
+      },
+      "stdout_preview": "[记忆] 已加载 15 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] research_assistant\n\n============================================================\n用户: （相关记忆：作者: K.A. Applegate）\n（相关记忆：当前时间为2026-07-16 08:59:46）\n（相关记忆：- 助手执行的代码功能：计算 1+2+3+4+5 并打印结果）Answer this multi-hop factual question. Use web_search and/or fetch_page when needed. Give a short FINAL ANSWER with the fact only.\n\nThe d",
+      "final_answer_preview": "New York City",
+      "reason": "gold mismatch: gold 'Greenwich Village, New York City' not found in prediction"
+    },
+    {
+      "id": "hotpot_val_0003",
+      "name": "hotpot_val_0003",
+      "benchmark": "hotpotqa",
+      "tags": [
+        "public_benchmark",
+        "hotpotqa"
+      ],
+      "difficulty": "medium",
+      "mode": "agent",
+      "passed": true,
+      "skipped": false,
+      "duration_seconds": 23.73,
+      "exit_code": 0,
+      "tools_called": [
+        "fetch_page",
+        "web_search"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "YG Entertainment",
+      "gold_match": {
+        "passed": true,
+        "reason": "contains"
+      },
+      "stdout_preview": "[记忆] 已加载 15 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] research_assistant\n\n============================================================\n用户: （相关记忆：作者: K.A. Applegate）\n（相关记忆：当前时间为2026-07-16 08:59:46）\n（相关记忆：- 颁奖时间：2025年10月7日）Answer this multi-hop factual question. Use web_search and/or fetch_page when needed. Give a short FINAL ANSWER with the fact only.\n\n2014 S/S is the de",
+      "final_answer_preview": "YG Entertainment",
+      "reason": "gold ok: contains"
+    },
+    {
+      "id": "hotpot_val_0004",
+      "name": "hotpot_val_0004",
+      "benchmark": "hotpotqa",
+      "tags": [
+        "public_benchmark",
+        "hotpotqa"
+      ],
+      "difficulty": "medium",
+      "mode": "agent",
+      "passed": true,
+      "skipped": false,
+      "duration_seconds": 51.03,
+      "exit_code": 0,
+      "tools_called": [
+        "fetch_page",
+        "web_search"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "Eenasul Fateh",
+      "gold_match": {
+        "passed": true,
+        "reason": "contains"
+      },
+      "stdout_preview": "[记忆] 已加载 15 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] research_assistant\n\n============================================================\n用户: （相关记忆：作者: K.A. Applegate）\n（相关记忆：- 助手执行的代码功能：计算 1+2+3+4+5 并打印结果）\n（相关记忆：当前时间为2026-07-16 08:59:46）Answer this multi-hop factual question. Use web_search and/or fetch_page when needed. Give a short FINAL ANSWER with the fact only.\n\nWho w",
+      "final_answer_preview": "** Eenasul Fateh (also known by his stage name Aladin), a Bangladeshi-British former international management consultant who advised organizations such as DEFRA, EDF Energy, Adidas, and Citibank on strategy and performance improvement.",
+      "reason": "gold ok: contains"
+    },
+    {
+      "id": "hotpot_val_0005",
+      "name": "hotpot_val_0005",
+      "benchmark": "hotpotqa",
+      "tags": [
+        "public_benchmark",
+        "hotpotqa"
+      ],
+      "difficulty": "medium",
+      "mode": "agent",
+      "passed": true,
+      "skipped": false,
+      "duration_seconds": 25.88,
+      "exit_code": 0,
+      "tools_called": [
+        "fetch_page",
+        "web_search"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "3,677 seated",
+      "gold_match": {
+        "passed": true,
+        "reason": "token_cover"
+      },
+      "stdout_preview": "[记忆] 已加载 20 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] research_assistant\n\n============================================================\n用户: （相关记忆：作者: K.A. Applegate）\n（相关记忆：当前时间为2026-07-16 08:59:46）\n（相关记忆：- 助手执行的代码功能：计算 1+2+3+4+5 并打印结果）Answer this multi-hop factual question. Use web_search and/or fetch_page when needed. Give a short FINAL ANSWER with the fact only.\n\nThe a",
+      "final_answer_preview": "3,677**",
+      "reason": "gold ok: token_cover"
+    },
+    {
+      "id": "hotpot_val_0006",
+      "name": "hotpot_val_0006",
+      "benchmark": "hotpotqa",
+      "tags": [
+        "public_benchmark",
+        "hotpotqa"
+      ],
+      "difficulty": "medium",
+      "mode": "agent",
+      "passed": true,
+      "skipped": false,
+      "duration_seconds": 25.84,
+      "exit_code": 0,
+      "tools_called": [
+        "web_search"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "Terry Richardson",
+      "gold_match": {
+        "passed": true,
+        "reason": "contains"
+      },
+      "stdout_preview": "[记忆] 已加载 20 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] research_assistant\n\n============================================================\n用户: （相关记忆：作者: K.A. Applegate）\n（相关记忆：当前时间为2026-07-16 08:59:46）\n（相关记忆：- 专业领域: 战略与绩效改进（strategy and performance improvement））Answer this multi-hop factual question. Use web_search and/or fetch_page when needed. Give a short FINAL ANSWER wit",
+      "final_answer_preview": "Terry Richardson",
+      "reason": "gold ok: contains"
+    },
+    {
+      "id": "hotpot_val_0007",
+      "name": "hotpot_val_0007",
+      "benchmark": "hotpotqa",
+      "tags": [
+        "public_benchmark",
+        "hotpotqa"
+      ],
+      "difficulty": "medium",
+      "mode": "agent",
+      "passed": true,
+      "skipped": false,
+      "duration_seconds": 27.11,
+      "exit_code": 0,
+      "tools_called": [
+        "fetch_page",
+        "web_search"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "Kansas Song",
+      "gold_match": {
+        "passed": true,
+        "reason": "token_cover"
+      },
+      "stdout_preview": "[记忆] 已加载 20 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] research_assistant\n\n============================================================\n用户: （相关记忆：作者: K.A. Applegate）\n（相关记忆：- 专业领域: 战略与绩效改进（strategy and performance improvement））\n（相关记忆：当前时间为2026-07-16 08:59:46）Answer this multi-hop factual question. Use web_search and/or fetch_page when needed. Give a short FINAL ANSWER wit",
+      "final_answer_preview": "\"I'm a Jayhawk\"",
+      "reason": "gold ok: token_cover"
+    },
+    {
+      "id": "hotpot_val_0008",
+      "name": "hotpot_val_0008",
+      "benchmark": "hotpotqa",
+      "tags": [
+        "public_benchmark",
+        "hotpotqa"
+      ],
+      "difficulty": "medium",
+      "mode": "agent",
+      "passed": true,
+      "skipped": false,
+      "duration_seconds": 47.31,
+      "exit_code": 0,
+      "tools_called": [
+        "fetch_page",
+        "web_search"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "David Weissman",
+      "gold_match": {
+        "passed": true,
+        "reason": "contains"
+      },
+      "stdout_preview": "[记忆] 已加载 20 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] research_assistant\n\n============================================================\n用户: （相关记忆：作者: K.A. Applegate）\n（相关记忆：- 获奖理由：发现了电路中的宏观量子力学隧穿效应和能量量子化）\n（相关记忆：当前时间为2026-07-16 08:59:46）Answer this multi-hop factual question. Use web_search and/or fetch_page when needed. Give a short FINAL ANSWER with the fact only.\n\nWhat ",
+      "final_answer_preview": "David Diamond and David Weissman",
+      "reason": "gold ok: contains"
+    },
+    {
+      "id": "hotpot_val_0009",
+      "name": "hotpot_val_0009",
+      "benchmark": "hotpotqa",
+      "tags": [
+        "public_benchmark",
+        "hotpotqa"
+      ],
+      "difficulty": "medium",
+      "mode": "agent",
+      "passed": true,
+      "skipped": false,
+      "duration_seconds": 39.14,
+      "exit_code": 0,
+      "tools_called": [
+        "fetch_page",
+        "web_search"
+      ],
+      "tool_success": true,
+      "has_final_answer": true,
+      "gold_answer": "1999",
+      "gold_match": {
+        "passed": true,
+        "reason": "contains"
+      },
+      "stdout_preview": "[记忆] 已加载 21 条记忆（语义）\n  [记忆] 加载语义模型...\n[启动] 已设置 REACT_AGENT_SKIP_RAG，跳过 RAG 加载\n[角色] research_assistant\n\n============================================================\n用户: （相关记忆：作者: K.A. Applegate）\n（相关记忆：当前时间为2026-07-16 08:59:46）\n（相关记忆：- 获奖理由：发现了电路中的宏观量子力学隧穿效应和能量量子化）Answer this multi-hop factual question. Use web_search and/or fetch_page when needed. Give a short FINAL ANSWER with the fact only.\n\nWhat ",
+      "final_answer_preview": "1999",
+      "reason": "gold ok: contains"
+    }
+  ],
+  "meta": {
+    "git": "b4d29f6",
+    "reproduce_cmd": "python examples/run_public_benchmark.py --modes agent --publish"
+  }
+}

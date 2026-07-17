@@ -21,6 +21,7 @@
 | [FAILURE_FLYWHEEL.md](./FAILURE_FLYWHEEL.md) | 失败→动作→复测飞轮 | 真闭环已勾选 | 配合 tdebug 扫描 |
 | [flywheel_closed_loop_20260716.md](./flywheel_closed_loop_20260716.md) | 同批 100 条改前/改后 | **llm_offtrack 6→1** | [snapshots/…](./snapshots/flywheel_closed_loop_20260716.json) |
 | [public_benchmark_snapshot_offline.md](./public_benchmark_snapshot_offline.md) | GSM8K×10 + HotpotQA×10 | offline 匹配器 20/20 | [归档](./snapshots/public_benchmark_snapshot_offline.json) |
+| [public_benchmark_snapshot_agent_20260717.md](./public_benchmark_snapshot_agent_20260717.md) | 同上 · DeepSeek agent | **19/20（95%）** · GSM8K 10/10 · Hotpot 9/10 · Wilson [76.4, 99.1] | [归档](./snapshots/public_benchmark_snapshot_agent_20260717.json) |
 
 当前 `capability_dataset.json` 已扩至 **24** 条（原 18 + 新 6）。全量重跑：
 
